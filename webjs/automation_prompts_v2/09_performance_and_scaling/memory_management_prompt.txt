@@ -1,0 +1,39 @@
+Title
+Memory Management Prompt
+
+Purpose
+Improve Shadow Shift's memory discipline so long sessions, repeated room transitions, and dense effect usage do not accumulate waste or stale state.
+
+Why This Matters for V2
+Memory issues in browser games often show up gradually through leaks, stale references, and room re-entry bugs. Fixing those early keeps development safer.
+
+Detailed Codex Instructions
+Context:
+The game is growing in complexity. V2 needs clearer cleanup and lifecycle handling for rooms, entities, FX, saves, and UI state.
+
+Goal:
+Audit and improve memory management patterns across the runtime.
+
+Implementation Steps:
+1. Audit entity cleanup, room transition cleanup, event/listener lifetimes, effect arrays, save/UI overlays, and debug systems.
+2. Remove stale references and make cleanup rules explicit.
+3. Ensure temporary room entities and effects are destroyed or recycled cleanly.
+4. Add comments or helper functions that define ownership and teardown behavior.
+5. Avoid keeping dead arrays or large object graphs alive accidentally.
+
+Constraints:
+- Keep implementation incremental
+- Preserve readability
+- Do not add unnecessary complexity
+
+Implementation Notes
+- Memory discipline is largely about lifecycle clarity.
+- Pair this with room system and pooling work where useful.
+- Debug overlays and automation helpers can also leak if unmanaged.
+
+Validation Checklist
+- Repeated room transitions do not accumulate stale entities
+- Temporary FX/state cleans up properly
+- Long sessions are more stable
+- Cleanup logic is clearer
+- No major regressions are introduced

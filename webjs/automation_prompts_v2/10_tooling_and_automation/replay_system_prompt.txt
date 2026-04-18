@@ -1,0 +1,39 @@
+Title
+Replay System Prompt
+
+Purpose
+Add a lightweight replay/input recording system to Shadow Shift for debugging, tuning, regression testing, and combat/movement analysis.
+
+Why This Matters for V2
+Replays are powerful engineering tools. They help reproduce bugs, compare tuning changes, and validate difficult platforming/combat interactions.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already has nuanced movement and combat. Replay support would make future balancing and debugging far more reliable.
+
+Goal:
+Implement a deterministic-enough input recording and playback system suitable for local development and tuning.
+
+Implementation Steps:
+1. Audit input handling, timing assumptions, and save/reset flow to determine what must be captured.
+2. Record player inputs, key state changes, timestamps or frame indices, and seed/state context needed for playback.
+3. Add a replay playback mode that feeds recorded input back into the game.
+4. Provide simple developer controls for start/stop recording and playback.
+5. Document any determinism limits clearly.
+
+Constraints:
+- Keep the system lightweight
+- Do not assume perfect determinism unless the runtime supports it
+- Focus on practical debugging value
+
+Implementation Notes
+- Frame-indexed input logs are often enough for a browser action game.
+- Pairing replay with room spawn/reset tools is especially useful.
+- If full replay fidelity is hard, prioritize reproducibility of core movement/combat scenarios.
+
+Validation Checklist
+- Inputs can be recorded and replayed
+- Common movement/combat sequences reproduce reliably enough for testing
+- Developer controls are clear
+- The feature helps debugging and tuning
+- Replay code is isolated and maintainable

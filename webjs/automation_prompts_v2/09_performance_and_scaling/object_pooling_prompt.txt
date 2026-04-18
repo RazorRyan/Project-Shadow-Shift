@@ -1,0 +1,39 @@
+Title
+Object Pooling Prompt
+
+Purpose
+Introduce object pooling for high-churn runtime objects in Shadow Shift such as particles, slash effects, projectiles, and temporary combat visuals.
+
+Why This Matters for V2
+Repeated allocation and garbage collection can quietly harm browser performance, especially once effects and enemies become denser.
+
+Detailed Codex Instructions
+Context:
+The game already uses transient objects for combat and presentation. V2 should control that churn more intentionally.
+
+Goal:
+Implement a practical pooling system for the most frequently spawned short-lived runtime objects.
+
+Implementation Steps:
+1. Audit which objects are created and destroyed most often during play.
+2. Build a lightweight pool utility that can acquire, reset, and release objects.
+3. Apply it first to obvious high-churn categories like particles, slashes, projectiles, or impact effects.
+4. Keep the API simple so gameplay code stays readable.
+5. Avoid pooling everything; only pool what actually churns enough to matter.
+
+Constraints:
+- Preserve current behavior
+- Avoid making pooled object state bugs hard to debug
+- Keep code maintainable
+
+Implementation Notes
+- Reset logic is critical; stale state is the main risk.
+- Pair with profiling to validate the win.
+- Small generic pools plus per-type reset helpers often work well.
+
+Validation Checklist
+- Targeted transient objects are pooled correctly
+- No stale-state bugs appear
+- Performance/GC behavior improves in effect-heavy moments
+- The code remains understandable
+- Pooling stays limited to worthwhile cases

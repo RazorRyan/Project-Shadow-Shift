@@ -1,0 +1,45 @@
+Title
+Map System Prompt
+
+Purpose
+Add a basic but scalable map system to Shadow Shift that supports room discovery, player position, checkpoints, and future progression cues.
+
+Why This Matters for V2
+Maps are essential to Metroidvania readability and route planning. Even a modest map system dramatically improves the sense of world structure.
+
+Detailed Codex Instructions
+Context:
+The game already has rooms and progression. V2 should make that world structure visible to the player in a lightweight way.
+
+Goal:
+Implement a room-based map system that reflects current world data and can expand with progression features later.
+
+Implementation Steps:
+1. Audit current room definitions and identify metadata needed for a map.
+2. Create a room map data layer with fields for:
+   - discovered
+   - visited
+   - checkpoint present
+   - boss room
+   - theme
+   - connections
+3. Build a lightweight map overlay that shows discovered rooms and the player's current room.
+4. Add support for updating discovery state when entering rooms.
+5. Keep visuals simple but readable and in-theme.
+
+Constraints:
+- Do not overbuild a giant map editor in this task
+- Keep the map responsive and lightweight
+- Preserve current room flow
+
+Implementation Notes
+- Start with a room-node or room-tile map, not a full geometric automap.
+- Make the map data compatible with save persistence.
+- Leave room for markers and progression hints later.
+
+Validation Checklist
+- The map opens and displays current room information
+- Room discovery updates correctly
+- Save data can preserve discovery
+- The UI remains readable
+- The system supports future expansion

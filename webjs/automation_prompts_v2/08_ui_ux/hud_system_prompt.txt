@@ -1,0 +1,44 @@
+Title
+HUD System Prompt
+
+Purpose
+Refactor Shadow Shift's HUD into a cleaner V2 UI system that better communicates health, world state, element state, weapon/combat status, and checkpoint context.
+
+Why This Matters for V2
+UI quality affects perceived polish immediately. A better HUD also reduces player confusion when multiple systems are active at once.
+
+Detailed Codex Instructions
+Context:
+The game already has basic HUD elements and debug/testing controls. V2 should make the interface more structured, readable, and extensible.
+
+Goal:
+Build a reusable HUD system with clearer layout, data binding, and state-specific display behavior.
+
+Implementation Steps:
+1. Audit current HUD rendering, DOM overlays, and gameplay state display.
+2. Separate persistent gameplay HUD from temporary prompts, debug overlays, death/win screens, and contextual interaction prompts.
+3. Add clearer display logic for:
+   - health and damage feedback
+   - current world
+   - current element
+   - combo/attack info if appropriate
+   - shrine/checkpoint prompts
+4. Keep the design atmospheric but readable.
+5. Structure the UI code so future map/inventory systems slot in cleanly.
+
+Constraints:
+- Preserve current HTML/CSS/canvas stack
+- Keep the gameplay viewport prioritized
+- Avoid cluttering the screen
+
+Implementation Notes
+- Separate data formatting from rendering logic.
+- The HUD should be readable on desktop and future mobile layouts.
+- Use subtle motion/feedback where it helps communication.
+
+Validation Checklist
+- HUD is easier to read
+- Gameplay state is communicated clearly
+- Contextual prompts still work
+- The screen remains uncluttered
+- The system is easier to extend

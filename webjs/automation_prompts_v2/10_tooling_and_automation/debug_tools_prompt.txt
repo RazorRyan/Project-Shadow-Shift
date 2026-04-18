@@ -1,0 +1,45 @@
+Title
+Debug Tools Prompt
+
+Purpose
+Build a practical developer debug toolkit for Shadow Shift V2 so movement, combat, AI, rooms, and progression can be tested faster and more safely.
+
+Why This Matters for V2
+As system complexity grows, iteration speed depends on tooling. Good debug tools save enormous time and reduce regression risk.
+
+Detailed Codex Instructions
+Context:
+The game already includes some testing and tuning needs across movement, enemies, progression, and rendering.
+
+Goal:
+Implement an in-game or developer-facing debug toolset that improves visibility and workflow.
+
+Implementation Steps:
+1. Audit the most common tuning and bug-fixing needs, such as:
+   - invulnerability toggles
+   - room warp
+   - spawn enemy
+   - grant abilities
+   - show hitboxes
+   - inspect AI states
+   - refill health
+2. Create a lightweight debug layer or overlay with keyboard shortcuts and optional on-screen information.
+3. Make debug features easy to disable in normal play.
+4. Keep debug logic organized and separate from release-facing UI where practical.
+
+Constraints:
+- Do not bury gameplay logic inside debug-only paths
+- Keep tools lightweight and readable
+- Preserve current architecture
+
+Implementation Notes
+- Debug tooling should expose state, not just mutate it.
+- The best debug tools shorten validation loops for every future prompt.
+- Consider routing debug actions through existing systems instead of bypassing them in dangerous ways.
+
+Validation Checklist
+- High-value debug actions are available
+- Hitboxes/states can be inspected easily
+- Room and progression testing is faster
+- Debug code is organized
+- Normal play is not polluted by debug-only behavior

@@ -1,0 +1,40 @@
+Title
+Shadow Swap Mechanics Prompt
+
+Purpose
+Deepen Shadow Shift's core world-switch mechanic so Shadow Swap becomes more systemic, reactive, and central to traversal and combat.
+
+Why This Matters for V2
+Shadow Swap is the game's signature mechanic. V2 should make it feel like a world logic system, not just a visibility toggle.
+
+Detailed Codex Instructions
+Context:
+The game already supports light/shadow switching and world-dependent objects. This pass should make the system more architecturally robust and mechanically richer.
+
+Goal:
+Upgrade Shadow Swap into a clearer shared mechanic that influences world objects, hazards, routes, enemy behavior, and combat rules.
+
+Implementation Steps:
+1. Audit current swap logic, world-dependent render behavior, object activation, and room interactions.
+2. Separate world-state ownership from individual object rendering where possible.
+3. Add a clear interface for swap-reactive objects so platforms, hazards, enemies, and scripted triggers can respond consistently.
+4. Expand swap logic in a few meaningful gameplay cases, such as enemy vulnerability windows, route changes, or shrine/door behaviors.
+5. Keep performance and readability stable.
+6. Document the rules for objects that exist in both worlds versus only one.
+
+Constraints:
+- Preserve current swap responsiveness
+- Avoid adding expensive global scans each frame
+- Keep the mechanic readable for players
+
+Implementation Notes
+- This system should support both traversal and combat design.
+- World-state queries should be explicit and centralized.
+- Preserve instant readability over excessive visual clutter.
+
+Validation Checklist
+- Swapping still works immediately
+- World-reactive objects behave consistently
+- The mechanic opens richer design space than before
+- Existing routes still function
+- The architecture is easier to extend with new swap interactions

@@ -1,0 +1,44 @@
+Title
+Enemy Variety Prompt
+
+Purpose
+Expand Shadow Shift's enemy roster with more distinct combat roles and encounter behaviors while preserving the game's current tone and movement-first combat style.
+
+Why This Matters for V2
+Enemy variety is what keeps rooms from blending together. Strong archetypes also let level design, Shadow Swap, and elements create more meaningful combinations.
+
+Detailed Codex Instructions
+Context:
+The game already has a small roster. V2 needs broader enemy variety that still fits the existing architecture and silhouette-driven style.
+
+Goal:
+Add a set of new enemy archetypes or meaningful behavior variants that introduce fresh combat problems without overwhelming the current game.
+
+Implementation Steps:
+1. Audit the current enemy roster and identify missing combat roles such as:
+   - pressure chaser
+   - zoning/ranged threat
+   - shielded defender
+   - aerial nuisance
+   - support/summoner
+2. Implement a few new archetypes or strong variants using the shared AI and combat systems.
+3. Give each one a readable role, movement style, punish window, and silhouette.
+4. Integrate them into a small set of rooms or encounter setups for validation.
+5. Preserve the dark, readable tone of the game.
+
+Constraints:
+- Do not flood the game with too many new enemies at once
+- Reuse shared systems
+- Keep performance stable
+
+Implementation Notes
+- Variety should come from behavior, pacing, and pressure type, not just stats.
+- Ensure each enemy contributes to encounter composition.
+- Avoid making every enemy highly mobile and aggressive.
+
+Validation Checklist
+- New enemy roles are clearly distinct
+- Existing rooms can leverage them without breaking
+- Combat remains readable
+- The roster feels richer than before
+- New archetypes fit the game's style and systems

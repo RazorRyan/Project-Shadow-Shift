@@ -1,0 +1,44 @@
+Title
+Lighting and Shadow Prompt
+
+Purpose
+Add a lightweight lighting and shadow presentation layer to Shadow Shift that deepens atmosphere and readability without departing from the current canvas architecture.
+
+Why This Matters for V2
+Lighting can sell mood, focus attention, and reinforce the game's identity. For a game called Shadow Shift, it should be part of the presentation language.
+
+Detailed Codex Instructions
+Context:
+The game already has strong thematic rendering. This pass should add selective lighting and shadow treatment, not a heavy real-time lighting engine.
+
+Goal:
+Implement a performant 2D lighting presentation layer for room ambience, attacks, shrines, and special world objects.
+
+Implementation Steps:
+1. Audit current draw order, room backgrounds, glows, and world-state tinting.
+2. Add a lightweight lighting pass or overlay strategy using gradients, additive blends, and palette-aware glows.
+3. Support local lights for:
+   - shrine/bench
+   - pickups
+   - boss focal points
+   - elemental attack flashes
+   - environmental fixtures if present
+4. Ensure lights complement Shadow Swap and element visuals rather than fighting them.
+5. Keep performance and readability stable.
+
+Constraints:
+- No heavy dynamic lighting engine
+- Preserve silhouette readability
+- Keep browser performance in mind
+
+Implementation Notes
+- Favor selective hand-authored light accents.
+- Build reusable light descriptors if practical.
+- Use darkness to frame gameplay, not obscure it.
+
+Validation Checklist
+- Rooms feel moodier and more intentional
+- Important gameplay objects remain readable
+- Shadow/element states still read clearly
+- Performance remains acceptable
+- The lighting layer is extensible and controlled

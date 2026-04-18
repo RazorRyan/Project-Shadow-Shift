@@ -1,0 +1,43 @@
+Title
+Environment Reactivity Prompt
+
+Purpose
+Make Shadow Shift's world feel more alive by letting hazards, barriers, platforms, switches, and ambient objects respond more clearly to player abilities and world states.
+
+Why This Matters for V2
+Reactive environments make the world feel authored and intelligent. They also make abilities feel meaningful outside of combat.
+
+Detailed Codex Instructions
+Context:
+The game already has some reactive objects, such as barriers and world-swapped platforms. V2 should generalize and expand this behavior.
+
+Goal:
+Build a shared environment reactivity layer that connects player actions to world responses in a readable, extensible way.
+
+Implementation Steps:
+1. Audit current reactive objects and one-off interaction logic.
+2. Create a common interaction contract for world objects, including:
+   - accepted triggers
+   - response behavior
+   - persistent versus temporary state
+   - visual feedback hooks
+3. Update several existing object types to use the shared model.
+4. Add at least one or two richer reactive world behaviors that combine movement, Shadow Swap, or elements.
+5. Preserve simple collision and room geometry.
+
+Constraints:
+- No full puzzle engine rewrite
+- Keep the world readable and performant
+- Preserve current level flow
+
+Implementation Notes
+- Prefer a small set of composable triggers and responses.
+- Keep persistent and temporary state separate.
+- Use this system to reduce hardcoded special cases.
+
+Validation Checklist
+- Existing reactive objects still work
+- New reactive behaviors feel coherent
+- Object logic is easier to extend
+- Visual feedback remains readable
+- The world feels more systemic than before

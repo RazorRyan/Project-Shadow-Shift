@@ -1,0 +1,44 @@
+Title
+Ability Gating Prompt
+
+Purpose
+Refine Shadow Shift's gating logic so traversal abilities, Shadow Swap, elements, and combat upgrades interact with the world in a clear and extensible way.
+
+Why This Matters for V2
+Ability gating is the backbone of Metroidvania exploration. Weak gating feels arbitrary. Strong gating feels like the world remembers what the player has learned.
+
+Detailed Codex Instructions
+Context:
+The game already has basic gates and ability pickups. V2 should formalize this into a reusable gating system.
+
+Goal:
+Implement a cleaner ability gating framework that makes world rules explicit and data-driven.
+
+Implementation Steps:
+1. Audit current gates, pickups, route blockers, and one-off ability checks.
+2. Create a standard requirement format for world interactions, such as:
+   - required abilities
+   - required element
+   - required world state
+   - required key item
+   - optional alternate solutions
+3. Update gates, barriers, traversal objects, and special routes to use the shared requirement format.
+4. Preserve current routes while improving system clarity.
+5. Add debug helpers or labels if useful for testing progression.
+
+Constraints:
+- No full content rewrite
+- Preserve room readability
+- Keep logic lightweight and browser-friendly
+
+Implementation Notes
+- Support alternate solutions where good level design benefits from them.
+- Use explicit requirement queries instead of buried branching.
+- Keep future designer tuning in mind.
+
+Validation Checklist
+- Ability checks are centralized
+- Current gates still function
+- Alternate route logic is easier to express
+- World interactions are easier to extend
+- The system supports future level growth cleanly

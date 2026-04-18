@@ -1,0 +1,48 @@
+Title
+Save and Checkpoint System Prompt
+
+Purpose
+Upgrade Shadow Shift's save, checkpoint, shrine, and restart systems into a clearer V2 persistence flow with better room awareness and cleaner player expectations.
+
+Why This Matters for V2
+Checkpoint logic is a trust system. If players do not understand where they will respawn, what has been saved, or what resets, the game feels cheap and inconsistent.
+
+Detailed Codex Instructions
+Context:
+The game already has shrine/bench-style saving and level restart behavior. This pass should formalize and strengthen the system.
+
+Goal:
+Create a clearer save/checkpoint architecture that supports room-based respawns, progression persistence, and future world expansion.
+
+Implementation Steps:
+1. Audit current save state, shrine interactions, checkpoint activation, retry flow, and restart behavior.
+2. Define explicit save payload categories such as:
+   - progression unlocks
+   - player upgrades
+   - checkpoint/shrine location
+   - room flags
+   - temporary encounter reset state
+3. Clarify rules for:
+   - what saves immediately
+   - what saves only on shrine rest
+   - what resets on death
+   - what resets on restart level
+4. Improve checkpoint data structures so rooms and spawn points are easier to reason about.
+5. Add lightweight debug helpers to inspect saved state during development.
+
+Constraints:
+- Keep browser storage simple
+- Preserve current player expectations around shrine saves
+- Avoid introducing corrupt save edge cases
+
+Implementation Notes
+- Player-facing clarity matters as much as internal structure.
+- Separate permanent progression from temporary room-state data.
+- Keep the save schema versionable if possible.
+
+Validation Checklist
+- Shrine saving still works
+- Retry from shrine behaves predictably
+- Restart level behaves predictably
+- Progression persistence is more structured
+- Save logic is easier to debug and extend

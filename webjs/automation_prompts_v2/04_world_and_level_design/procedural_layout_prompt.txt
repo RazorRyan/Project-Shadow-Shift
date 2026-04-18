@@ -1,0 +1,45 @@
+Title
+Procedural Layout Prompt
+
+Purpose
+Create a lightweight procedural layout framework for Shadow Shift that can assemble testable room chains, challenge variants, or gauntlet branches without replacing authored level design.
+
+Why This Matters for V2
+Procedural generation can accelerate iteration, testing, and replayable challenge content when used carefully. For Shadow Shift, it should support authored design rather than replace it.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift is a handcrafted Metroidvania-style game. The goal is not a roguelike rewrite, but a modular layout system that can generate safe test routes or optional content.
+
+Goal:
+Add a procedural layout helper that can combine predefined room chunks or room templates into coherent sequences.
+
+Implementation Steps:
+1. Define a room template format with metadata such as:
+   - connection types
+   - traversal requirements
+   - combat density
+   - theme compatibility
+   - checkpoint suitability
+2. Build a simple layout generator that selects compatible templates and assembles them into a chain.
+3. Use it for debug/test routes or optional challenge sequences first.
+4. Keep authored main progression intact.
+5. Add validation rules to reject impossible or unreadable combinations.
+6. Expose generation parameters through debug tools if practical.
+
+Constraints:
+- Do not replace handcrafted main levels
+- Keep generation deterministic with seed support if possible
+- Preserve room readability and traversal logic
+
+Implementation Notes
+- Think modular authored chunks, not full random noise generation.
+- This system is valuable for testing new mechanics rapidly.
+- Ability requirements should be explicit and machine-readable.
+
+Validation Checklist
+- The generator can assemble at least one valid playable route
+- Generated room chains respect connection rules
+- Required abilities are tracked correctly
+- The main authored route still works unchanged
+- The system is useful for iteration, not chaos

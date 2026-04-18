@@ -1,0 +1,43 @@
+Title
+Inventory and Upgrades Prompt
+
+Purpose
+Introduce a lightweight inventory and upgrade presentation layer for Shadow Shift that supports weapon evolution, ability unlocks, key items, and future progression systems.
+
+Why This Matters for V2
+As the game grows, the player needs a structured way to understand what they have unlocked and what systems are evolving.
+
+Detailed Codex Instructions
+Context:
+The current slice already includes pickups, abilities, and upgrades. V2 should expose those systems more clearly without becoming menu-heavy.
+
+Goal:
+Implement a modular inventory/upgrades UI and supporting data structures for current and future progression items.
+
+Implementation Steps:
+1. Audit current progression data, pickups, weapon upgrades, and permanent unlock flags.
+2. Define categories such as:
+   - abilities
+   - elemental unlocks
+   - weapon upgrades
+   - relic/key items
+3. Build a lightweight overlay or panel for viewing current upgrades.
+4. Keep navigation simple and keyboard-friendly.
+5. Ensure the data model aligns with save/checkpoint persistence.
+
+Constraints:
+- Do not create a bloated RPG menu
+- Keep the system lightweight and easy to read
+- Preserve gameplay pacing
+
+Implementation Notes
+- This should feel like a Metroidvania progression view, not a loot game inventory.
+- The underlying data model matters as much as the visual panel.
+- Leave room for future charm/relic-style systems if desired.
+
+Validation Checklist
+- Current upgrades are displayed clearly
+- Data aligns with save/progression systems
+- The UI is easy to navigate
+- The feature does not slow down core gameplay flow
+- Future unlock categories can be added safely

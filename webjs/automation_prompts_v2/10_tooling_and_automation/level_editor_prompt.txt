@@ -1,0 +1,43 @@
+Title
+Level Editor Prompt
+
+Purpose
+Create a lightweight level editing workflow for Shadow Shift that makes room composition, object placement, and route testing faster without requiring a separate engine.
+
+Why This Matters for V2
+Content speed becomes the bottleneck quickly in Metroidvanias. Even a modest editor or authoring workflow can multiply development velocity.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift is a browser-based game with handcrafted rooms, simple geometry, and growing world/system complexity.
+
+Goal:
+Implement a practical room authoring workflow that supports current level construction needs inside the existing stack.
+
+Implementation Steps:
+1. Audit how rooms, platforms, hazards, pickups, checkpoints, enemies, and gates are currently authored.
+2. Choose a pragmatic editor approach, such as:
+   - in-browser edit mode
+   - structured room JSON/data files with helper tools
+   - developer overlay for placement and export
+3. Support placement and editing of the most important room objects first.
+4. Keep collision geometry simple and data-driven.
+5. Add export/import or copy-paste-friendly room data serialization.
+6. Preserve current room runtime behavior.
+
+Constraints:
+- No separate heavyweight editor app
+- Keep tooling in vanilla JavaScript
+- Do not break existing rooms
+
+Implementation Notes
+- This can start as a dev-only room edit mode.
+- Data format clarity matters as much as the editor UI.
+- Prioritize authoring speed for common room tasks.
+
+Validation Checklist
+- A developer can place/edit core room objects faster than before
+- Room data remains valid and readable
+- Existing rooms can be represented in the system
+- Runtime still loads rooms correctly
+- The workflow accelerates content iteration meaningfully

@@ -1,0 +1,46 @@
+Title
+Animation System Prompt
+
+Purpose
+Create a lightweight animation system for Shadow Shift that improves character motion, enemy readability, and state-driven presentation without relying on spritesheet-heavy workflows.
+
+Why This Matters for V2
+The game already uses strong canvas-rendered silhouettes. A structured animation layer will make those silhouettes feel alive and stateful instead of manually offset in scattered draw code.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift currently uses rendering offsets, squash/stretch, and telegraph hooks. V2 should formalize those techniques into a reusable animation framework.
+
+Goal:
+Implement a procedural/state-driven animation system for player and enemies that can drive pose offsets, squash/stretch, cape lag, attack follow-through, and telegraph motion.
+
+Implementation Steps:
+1. Audit current player and enemy render polish logic.
+2. Create animation descriptors or state-driven render profiles that support:
+   - idle motion
+   - run bob
+   - jump stretch
+   - landing squash
+   - dash smear
+   - attack anticipation/follow-through
+   - hurt/reaction offsets
+3. Separate gameplay state from animation state while keeping them linked through explicit hooks.
+4. Apply the framework to the player first, then one or two enemy families.
+5. Keep all motion readable and silhouette-friendly.
+
+Constraints:
+- Preserve current canvas architecture
+- Avoid overcomplicated bone systems
+- Keep the system lightweight and maintainable
+
+Implementation Notes
+- Procedural animation is a good fit for the current style.
+- State-driven pose layers are more valuable than complex interpolation everywhere.
+- Document how animation responds to gameplay states.
+
+Validation Checklist
+- Player motion feels more alive and consistent
+- Enemy telegraphs are clearer
+- Animation logic is easier to extend than before
+- Silhouette readability is preserved
+- The system supports future polish without major rewrites

@@ -1,0 +1,47 @@
+Title
+Room System Prompt
+
+Purpose
+Refactor Shadow Shift's world flow into a clearer room system that supports transitions, room metadata, streaming-friendly setup, encounter scripting, and save/checkpoint integration.
+
+Why This Matters for V2
+As the game grows beyond a vertical slice, room management becomes an architectural concern. A solid room system keeps world-building scalable and makes Metroidvania progression easier to manage.
+
+Detailed Codex Instructions
+Context:
+The game already has multiple rooms/areas and progression flow. The next step is to formalize room management without changing the HTML/canvas foundation.
+
+Goal:
+Implement a reusable room system with clear room data, load/enter/exit behavior, and hooks for gameplay systems.
+
+Implementation Steps:
+1. Audit current room data, transitions, and camera/world logic.
+2. Define a room data structure that can hold:
+   - room id
+   - bounds
+   - theme/visual id
+   - spawn points
+   - entity placements
+   - gates/checkpoints
+   - scripting hooks
+3. Add clear room lifecycle hooks such as `enterRoom`, `exitRoom`, `spawnRoomEntities`, and cleanup behavior.
+4. Make current rooms use the new structure incrementally.
+5. Ensure compatibility with save/checkpoint and boss/encounter logic.
+6. Keep the implementation data-driven where practical.
+
+Constraints:
+- No full level streaming rewrite
+- Preserve current room progression
+- Keep current gameplay working during migration
+
+Implementation Notes
+- Rooms should own their content metadata, not bury it in unrelated code.
+- Keep room loading deterministic and simple.
+- Leave space for future map and procedural generation work.
+
+Validation Checklist
+- Existing rooms still load and play correctly
+- Room transitions remain functional
+- Room data is easier to inspect and extend
+- Checkpoints and progression hooks still work
+- Adding a new room is simpler than before

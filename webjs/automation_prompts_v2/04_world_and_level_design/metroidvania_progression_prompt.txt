@@ -1,0 +1,45 @@
+Title
+Metroidvania Progression Prompt
+
+Purpose
+Design and implement a stronger progression layer for Shadow Shift V2 so abilities, keys, world states, and route decisions create a more satisfying exploration structure.
+
+Why This Matters for V2
+A Metroidvania lives on progression texture. If unlocks are too linear or gates too arbitrary, the world stops feeling interconnected and discoverable.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already includes movement, Shadow Swap, Element Shift, combat upgrades, rooms, and some progression. V2 should turn those into a more intentional progression framework.
+
+Goal:
+Refactor progression into explicit systems for unlocks, route gating, revisit value, and world-state awareness.
+
+Implementation Steps:
+1. Audit existing unlocks, gates, pickups, and room dependencies.
+2. Define a progression data model for:
+   - permanent abilities
+   - key items
+   - weapon upgrades
+   - world-state toggles
+   - optional secrets
+3. Add helpers that let rooms, gates, and interactables query progression requirements cleanly.
+4. Strengthen one or two progression loops so backtracking and ability reuse feel more intentional.
+5. Keep the current vertical slice playable while improving the structure underneath.
+6. Add comments and data definitions that make future route planning easier.
+
+Constraints:
+- Do not overbuild a huge RPG inventory system here
+- Preserve current core route playability
+- Keep implementation understandable and inspectable
+
+Implementation Notes
+- Progression should be data-driven enough for future map integration.
+- Use this pass to eliminate hardcoded one-off gating checks where possible.
+- Maintain clarity around what is required versus optional.
+
+Validation Checklist
+- Abilities and gates use clearer shared rules
+- Backtracking opportunities feel more intentional
+- Unlock logic is easier to maintain
+- Existing progression still works
+- The world structure is easier to extend

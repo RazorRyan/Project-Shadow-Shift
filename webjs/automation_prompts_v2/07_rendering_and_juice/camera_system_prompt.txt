@@ -1,0 +1,44 @@
+Title
+Camera System Prompt
+
+Purpose
+Upgrade Shadow Shift's camera into a cleaner V2 system with room awareness, look-ahead, combat framing, and event hooks while preserving readability.
+
+Why This Matters for V2
+The camera is invisible until it feels wrong. Strong camera behavior makes movement, combat, and room transitions feel professional even before more content is added.
+
+Detailed Codex Instructions
+Context:
+The game already has a camera follow system. V2 should deepen it without compromising the 2D action readability of the current slice.
+
+Goal:
+Implement a modular camera system that supports follow logic, room bounds, directional look, combat emphasis, and scripted events.
+
+Implementation Steps:
+1. Audit current camera follow and room-bound behavior.
+2. Separate camera state and update logic from raw rendering transforms.
+3. Add support for:
+   - room bounds/clamping
+   - horizontal and vertical look-ahead
+   - damping/smoothing tuning
+   - boss or scripted camera events
+   - shake hooks
+4. Keep camera behavior readable during dashes, pogo, and boss fights.
+5. Expose tuning values in a centralized config.
+
+Constraints:
+- Do not make the camera overly floaty
+- Preserve gameplay readability
+- Keep implementation lightweight
+
+Implementation Notes
+- Distinguish exploration framing from combat framing.
+- Let room metadata inform camera rules where possible.
+- Build small helper functions rather than giant monolithic camera code.
+
+Validation Checklist
+- Camera follow still feels responsive
+- Room transitions remain readable
+- Combat and movement benefit from improved framing
+- Future scripted events are easier to support
+- The camera code is easier to tune and maintain

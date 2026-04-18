@@ -1,0 +1,44 @@
+Title
+Puzzle Design Prompt
+
+Purpose
+Add a lightweight puzzle framework to Shadow Shift that combines Shadow Swap, elements, traversal, and environmental reactivity without compromising pacing.
+
+Why This Matters for V2
+Good Metroidvania puzzles are not separate from movement and combat; they are extensions of the core verbs. A small but solid puzzle layer increases world depth immediately.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already has the right mechanical ingredients for strong environmental puzzles. The next step is to structure them.
+
+Goal:
+Implement a reusable framework for simple multi-step puzzle interactions and add a few representative puzzle patterns to the current slice.
+
+Implementation Steps:
+1. Audit existing world interactions that can serve as puzzle building blocks.
+2. Define a small set of puzzle primitives, such as:
+   - world-state toggles
+   - elemental activators
+   - timed platforms
+   - chained triggers
+   - temporary route windows
+3. Build a shared logic path for puzzle conditions and completion state.
+4. Add one or two puzzle scenarios that combine Shadow Swap with elements or traversal.
+5. Keep puzzle feedback clear and avoid obscuring core movement flow.
+
+Constraints:
+- Do not turn the game into a puzzle-only experience
+- Preserve combat and traversal pacing
+- Keep logic data-driven where practical
+
+Implementation Notes
+- Focus on reusable puzzle primitives, not handcrafted one-off hacks.
+- Timing and feedback are critical.
+- Make puzzle state debugging possible through simple dev hooks.
+
+Validation Checklist
+- Puzzle logic works reliably
+- Shadow Swap and elements integrate naturally into puzzles
+- Added puzzles remain readable and fair
+- The system supports future expansion
+- Progression and room flow are not broken

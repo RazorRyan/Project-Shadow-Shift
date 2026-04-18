@@ -1,0 +1,44 @@
+Title
+Particles and Effects Prompt
+
+Purpose
+Build a reusable particle and effects layer for Shadow Shift to support combat hits, elemental reactions, world interactions, and atmosphere.
+
+Why This Matters for V2
+Particles are one of the cheapest ways to make a game feel more premium, but only if they are structured well and stay readable.
+
+Detailed Codex Instructions
+Context:
+The game already has some slash and impact effects. V2 should consolidate and extend them.
+
+Goal:
+Implement a modular lightweight FX system for particles, trails, bursts, wisps, and ambient room effects.
+
+Implementation Steps:
+1. Audit current transient FX, slash trails, hit bursts, environmental wisps, and death effects.
+2. Create a shared FX/particle pipeline with effect definitions and simple spawn helpers.
+3. Add support for multiple effect families:
+   - slash arcs
+   - hit sparks
+   - elemental bursts
+   - shrine/save FX
+   - ambient room particles
+4. Ensure effect lifetime, pooling or reuse strategy, and render order are controlled.
+5. Keep the minimalist silhouette style readable.
+
+Constraints:
+- Do not overwhelm the screen
+- Keep performance stable on browser and mobile targets
+- Preserve gameplay readability first
+
+Implementation Notes
+- Use a small number of strong effect styles per category.
+- Build effect helpers that accept position, direction, palette, and intensity.
+- Coordinate with lighting and feedback systems where helpful.
+
+Validation Checklist
+- Effects feel richer and more consistent
+- Combat and world interactions benefit visibly
+- Render order remains clear
+- Performance remains acceptable
+- The FX system is easy to extend

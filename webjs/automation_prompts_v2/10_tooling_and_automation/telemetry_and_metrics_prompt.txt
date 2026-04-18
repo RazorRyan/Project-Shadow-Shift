@@ -1,0 +1,45 @@
+Title
+Telemetry and Metrics Prompt
+
+Purpose
+Introduce a lightweight telemetry and metrics layer for Shadow Shift so development decisions can be guided by real gameplay data during testing.
+
+Why This Matters for V2
+As the game deepens, intuition alone is not enough. Small, focused metrics can reveal pain points in rooms, bosses, deaths, and progression pacing.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift is still in active iteration. The goal is not live-service analytics, but practical development telemetry.
+
+Goal:
+Implement a local-friendly telemetry framework that records useful playtest metrics without bloating the project.
+
+Implementation Steps:
+1. Identify high-value gameplay events such as:
+   - deaths by room or cause
+   - shrine rests
+   - boss attempts
+   - ability pickup times
+   - element usage
+   - room completion times
+2. Create a simple event logging structure and storage path suitable for local testing.
+3. Add lightweight aggregation helpers for developer review.
+4. Keep privacy and scope appropriate; this is a development tool, not external analytics integration.
+5. Make the system easy to disable.
+
+Constraints:
+- Keep telemetry local and lightweight unless explicitly extended later
+- Avoid collecting noise with no design value
+- Do not let telemetry code clutter core gameplay paths
+
+Implementation Notes
+- Focus on metrics that answer real design questions.
+- Couple this with debug/replay tools for stronger diagnosis.
+- Local session summaries may be enough for now.
+
+Validation Checklist
+- High-value gameplay events are recorded
+- Metrics are readable and useful
+- The system does not harm performance noticeably
+- Telemetry can be turned off easily
+- The data supports balancing and room iteration decisions

@@ -1,0 +1,44 @@
+Title
+Element Interaction System Prompt
+
+Purpose
+Refactor Element Shift into a more systemic V2 interaction layer so fire, ice, wind, and future elements can affect combat, traversal, and the environment consistently.
+
+Why This Matters for V2
+Elements should feel like verbs, not just colors. A robust interaction system creates combat depth, puzzle potential, and world identity.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already includes Fire, Ice, and Wind states. This pass should deepen their systemic integration without rewriting the whole game.
+
+Goal:
+Implement a structured element interaction framework that handles attack tags, world reactions, status behavior, and object responses.
+
+Implementation Steps:
+1. Audit current element selection, attack modifications, and any world interactions.
+2. Define an element tagging and reaction model for:
+   - player attacks
+   - enemy resistances/vulnerabilities
+   - environmental objects
+   - movement modifiers
+3. Create clear helpers for checking and applying elemental effects.
+4. Update a few representative interactions across combat and traversal to use the shared system.
+5. Preserve current element readability and controls.
+6. Leave room for future combinations or advanced upgrades.
+
+Constraints:
+- Keep UI and controls simple
+- Do not overbuild a full RPG elemental simulation
+- Maintain performance and readability
+
+Implementation Notes
+- Start with a small, robust reaction table or mapping system.
+- Make status lifetimes and stacking rules explicit if any are added.
+- Keep elements mechanically distinct.
+
+Validation Checklist
+- Fire, Ice, and Wind still switch correctly
+- Combat and world interactions are more systematic
+- Adding a new reaction is easier than before
+- Current content still works
+- Element identity is stronger and clearer

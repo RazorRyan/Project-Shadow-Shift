@@ -1,0 +1,44 @@
+Title
+Accessibility Prompt
+
+Purpose
+Improve Shadow Shift's accessibility through input flexibility, readability options, contrast tuning, motion sensitivity support, and clearer communication of gameplay-critical information.
+
+Why This Matters for V2
+Accessibility is not a bonus feature. It directly improves usability, testability, and long-term player reach.
+
+Detailed Codex Instructions
+Context:
+The game currently targets browser play with keyboard input and strong atmosphere. V2 should preserve tone while making the game easier to perceive and control.
+
+Goal:
+Implement practical accessibility features that fit the current architecture and can expand over time.
+
+Implementation Steps:
+1. Audit current controls, screen effects, HUD readability, contrast, and color dependence.
+2. Add a lightweight settings structure for options such as:
+   - remappable keys or alternate layouts
+   - reduced screen shake
+   - reduced motion
+   - higher contrast UI or gameplay cues
+   - clearer prompt sizing
+3. Ensure gameplay-critical states are not communicated through color alone.
+4. Preserve current aesthetics while improving readability and player comfort.
+5. Keep settings easy to store and restore.
+
+Constraints:
+- Keep implementation lightweight
+- Avoid bloating the UI
+- Do not compromise core readability for style
+
+Implementation Notes
+- Start with the highest-impact settings first.
+- Reduced-motion support is especially important in action games.
+- Accessibility improvements should help debugging and tuning too.
+
+Validation Checklist
+- Critical gameplay information is clearer
+- Motion-heavy effects can be reduced
+- Alternate input setups are more feasible
+- The game remains atmospheric
+- Accessibility settings are saved and applied correctly

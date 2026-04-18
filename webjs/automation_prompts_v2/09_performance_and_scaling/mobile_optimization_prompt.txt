@@ -1,0 +1,40 @@
+Title
+Mobile Optimization Prompt
+
+Purpose
+Prepare Shadow Shift for stronger mobile/browser performance and usability so the current canvas build is easier to adapt toward Android and smaller screens.
+
+Why This Matters for V2
+Mobile constraints force good engineering discipline. Optimizing for them early improves the desktop build too.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift currently runs in the browser with future Android ambitions. The goal is to improve portability, not create a separate mobile fork.
+
+Goal:
+Implement practical optimizations and layout/input adjustments that make the game more mobile-friendly.
+
+Implementation Steps:
+1. Audit current render cost, viewport sizing, input assumptions, DOM overlays, and audio lifecycle behavior.
+2. Improve canvas sizing and resolution handling for smaller screens and high-DPI devices.
+3. Reduce unnecessary draw work where possible.
+4. Prepare or improve touch-friendly input hooks without replacing keyboard support.
+5. Ensure pause/resume, audio unlock, and browser visibility handling are robust on mobile-like environments.
+6. Keep UI readable on small screens.
+
+Constraints:
+- Preserve the current web build
+- Keep the codebase unified
+- Avoid overbuilding touch controls if the foundation is not ready yet
+
+Implementation Notes
+- Focus on portability-friendly architecture and performance.
+- Mobile optimization often overlaps with better lifecycle handling and cleaner UI layout.
+- Readability on small screens is part of optimization, not a separate afterthought.
+
+Validation Checklist
+- The game behaves more predictably on smaller screens
+- Runtime load is reduced where possible
+- Audio/input lifecycle handling is safer
+- The web build remains desktop-friendly
+- The codebase is more Android-portable than before

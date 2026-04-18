@@ -1,0 +1,45 @@
+Title
+Enemy AI State Machine Prompt
+
+Purpose
+Formalize Shadow Shift's enemy behavior architecture around reusable AI state machines so the game can support a wider enemy roster and more sophisticated encounters.
+
+Why This Matters for V2
+Enemy feel and maintainability both suffer when behavior is scattered across timers and one-off flags. A strong AI state framework makes enemy design faster, safer, and more expressive.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already has improved enemy states and telegraphs. V2 should turn that into a scalable AI foundation.
+
+Goal:
+Implement a reusable AI state machine framework and migrate current enemy archetypes onto it cleanly.
+
+Implementation Steps:
+1. Audit current enemy runtime data, states, timers, transitions, and attack conditions.
+2. Create a shared AI controller pattern that supports:
+   - state
+   - state timer
+   - transition guards
+   - state enter/update/exit
+   - target/player awareness
+   - reaction interrupts
+3. Migrate goblin, watcher, demon, shadow walker, oracle, and boss-compatible enemies incrementally.
+4. Keep enemy-specific personality in data or small behavior tables rather than deep bespoke branches.
+5. Add light debug visibility for current state where useful.
+
+Constraints:
+- Preserve enemy identities
+- Avoid a full entity rewrite if not needed
+- Keep the runtime lightweight
+
+Implementation Notes
+- Reuse the broader V2 state machine work if already implemented.
+- Prioritize clean transition logic and readability over cleverness.
+- Build so new enemies can be authored from shared behavior blocks plus overrides.
+
+Validation Checklist
+- Existing enemy archetypes still function
+- AI logic is easier to follow and extend
+- State transitions are explicit
+- Reactions and telegraphs still work
+- Adding a new enemy feels less risky

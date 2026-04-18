@@ -1,0 +1,44 @@
+Title
+Performance Optimization Prompt
+
+Purpose
+Profile and optimize Shadow Shift for smoother runtime performance as V2 adds more rooms, enemies, effects, and systems.
+
+Why This Matters for V2
+Feature growth without profiling leads to silent degradation. Performance work should be proactive before the game becomes content-heavy.
+
+Detailed Codex Instructions
+Context:
+The game runs in the browser with vanilla JavaScript and canvas. It already contains a meaningful amount of logic, rendering, and FX.
+
+Goal:
+Identify and address the most meaningful performance bottlenecks without prematurely micro-optimizing everything.
+
+Implementation Steps:
+1. Audit update and render hot paths, especially:
+   - entity iteration
+   - collision checks
+   - effects
+   - room object scans
+   - repeated allocations
+2. Add lightweight profiling hooks or counters where useful.
+3. Reduce waste in the heaviest loops first.
+4. Optimize data access patterns and object reuse where safe.
+5. Preserve readability; avoid turning the code into opaque micro-optimized fragments.
+
+Constraints:
+- No build tools or external profilers required beyond browser devtools assumptions
+- Preserve maintainability
+- Avoid speculative optimization with no measured target
+
+Implementation Notes
+- Optimize the top few bottlenecks, not everything.
+- Large gains often come from reducing repeated scans or allocations.
+- Pair this with pooling and memory passes where practical.
+
+Validation Checklist
+- Performance hot spots are identified and improved
+- The game remains functionally correct
+- Code is still readable
+- Browser runtime is smoother under load
+- Added metrics make future profiling easier

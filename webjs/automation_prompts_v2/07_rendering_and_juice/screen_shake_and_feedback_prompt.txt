@@ -1,0 +1,44 @@
+Title
+Screen Shake and Feedback Prompt
+
+Purpose
+Improve impact feedback in Shadow Shift with a more intentional screen shake and feedback framework tied to combat, movement, environment interactions, and bosses.
+
+Why This Matters for V2
+Good feedback makes actions feel heavier and more trustworthy. Bad feedback becomes noise. V2 needs a controlled system, not scattered effect calls.
+
+Detailed Codex Instructions
+Context:
+The game already has some shake and hit feel. This pass should formalize that feedback path.
+
+Goal:
+Implement a lightweight feedback framework for shake, hitstop coordination, flashes, and event-driven impact cues.
+
+Implementation Steps:
+1. Audit current screen shake, hitstop, slash FX, damage flashes, and event cues.
+2. Create a small feedback/event helper that can trigger:
+   - minor hit shake
+   - heavy impact shake
+   - dash burst shake
+   - boss event shake
+   - environmental rumble
+3. Add clear caps and damping so the screen never becomes unreadable.
+4. Integrate the system with combat events, pogo, boss slams, and world interactions.
+5. Preserve the dark atmospheric tone; feedback should enhance readability, not overpower it.
+
+Constraints:
+- Keep feedback subtle and controlled
+- Maintain performance
+- Avoid constant micro-shake noise
+
+Implementation Notes
+- Vary amplitude, duration, and frequency by event type.
+- Keep feedback event names explicit and designer-friendly.
+- Coordinate with camera system work if both are present.
+
+Validation Checklist
+- Impacts feel stronger without being chaotic
+- Boss and heavy hits stand out appropriately
+- Screen readability remains good
+- Feedback hooks are reusable
+- The system is easier to tune than ad hoc shake calls

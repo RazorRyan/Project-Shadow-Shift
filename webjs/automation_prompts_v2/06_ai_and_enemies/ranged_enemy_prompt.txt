@@ -1,0 +1,39 @@
+Title
+Ranged Enemy Prompt
+
+Purpose
+Add one or more ranged enemy archetypes to Shadow Shift using the current vanilla JavaScript canvas architecture, with fair telegraphs and room-aware pressure.
+
+Why This Matters for V2
+Ranged threats change how the player moves through space. They create layered encounters, force route decisions, and make platforming combat more dynamic.
+
+Detailed Codex Instructions
+Context:
+The current enemy set is primarily close-range. V2 should add ranged pressure without making fights feel cheap or bullet-spammy.
+
+Goal:
+Implement a ranged enemy framework and at least one concrete ranged enemy that fits the game's atmosphere and combat cadence.
+
+Implementation Steps:
+1. Design a ranged enemy role that fits the world, such as a shadow archer, ember caster, or void watcher variant.
+2. Add projectile data structures and update/render logic if not already present.
+3. Build readable telegraphs, firing cadence, projectile speed, and punish windows.
+4. Ensure projectiles integrate with collision, damage, Shadow Swap, and element systems where appropriate.
+5. Place the enemy into one or two rooms for encounter validation.
+
+Constraints:
+- Keep projectile counts modest
+- Preserve readability and fairness
+- Avoid a major performance hit
+
+Implementation Notes
+- Telegraph clarity is critical.
+- Projectile ownership, lifetime, and hit filtering should use the shared combat systems.
+- The best ranged enemies create movement decisions, not just unavoidable chip damage.
+
+Validation Checklist
+- Ranged enemy projectiles behave consistently
+- Telegraphs are clear
+- Encounters become more layered, not just more chaotic
+- Projectiles obey world and combat rules
+- Performance remains acceptable

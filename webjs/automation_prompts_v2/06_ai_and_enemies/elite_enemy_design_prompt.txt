@@ -1,0 +1,43 @@
+Title
+Elite Enemy Design Prompt
+
+Purpose
+Introduce elite enemies in Shadow Shift that act as mini-encounters: tougher than standard enemies, lighter than bosses, and capable of showcasing the game's deeper combat systems.
+
+Why This Matters for V2
+Elites create memorable spikes in tension and skill checks. They are also excellent bridges between basic enemies and full bosses.
+
+Detailed Codex Instructions
+Context:
+The game already includes basic enemies and at least one boss. V2 should add a middle tier that can anchor combat rooms and reward mastery.
+
+Goal:
+Design and implement one or more elite enemy templates using shared AI, reaction, and combat systems.
+
+Implementation Steps:
+1. Define what makes an elite in Shadow Shift:
+   - more layered move set
+   - stronger punish/reward loop
+   - clearer phase or aggression shift
+   - stronger reactions and resistances
+2. Choose one existing enemy family to elevate or create a new elite archetype.
+3. Implement elite-specific attack logic, recovery windows, and telegraphs.
+4. Add stronger reward signals on defeat, such as checkpoints, pickups, or route opening.
+5. Place elites in a meaningful room context.
+
+Constraints:
+- Do not make elites into full boss fights
+- Keep encounters readable
+- Reuse shared systems and data where possible
+
+Implementation Notes
+- Elites should teach boss-like reading in a smaller package.
+- Avoid pure health sponge design.
+- Make their identity obvious from silhouette, cadence, and arena behavior.
+
+Validation Checklist
+- Elite enemies feel meaningfully above standard enemies
+- Encounters remain fair and learnable
+- The elite uses shared systems cleanly
+- Reward/pacing payoff feels appropriate
+- The game gains stronger mid-tier combat variety
