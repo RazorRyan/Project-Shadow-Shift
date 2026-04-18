@@ -1,7 +1,31 @@
-const BASE_CANVAS_WIDTH = 1280;
-const BASE_CANVAS_HEIGHT = 720;
-const MAX_PARTICLES = 180;
-const MAX_SLASH_EFFECTS = 10;
+const {
+  BASE_CANVAS_WIDTH,
+  BASE_CANVAS_HEIGHT,
+  MAX_PARTICLES,
+  MAX_SLASH_EFFECTS,
+  SAVE_KEY
+} = window.ShadowShiftConstants;
+const {
+  createRect,
+  aabbOverlap,
+  collectWorldSolids,
+  resolveHorizontal,
+  resolveVertical,
+  probeOverlap
+} = window.ShadowShiftCollision;
+const { createEntityRegistry } = window.ShadowShiftEntities;
+const { BASE_MOVEMENT_TUNING, getMovementTuning, resolveHorizontalVelocity } = window.ShadowShiftMovement;
+const {
+  createHitbox,
+  createHurtbox,
+  getEnemyImpactTuning,
+  getImpactPowerForHit,
+  getReactionTypeFromHit,
+  getReactionDuration
+} = window.ShadowShiftCombat;
+const { createBossController, resolveBossPhase, chooseBossAttack } = window.ShadowShiftBoss;
+const { meetsRequirements } = window.ShadowShiftWorld;
+const { createStateMachine } = window.ShadowShiftStateMachine;
 
 const canvas = document.getElementById("gameCanvas");
 canvas.width = BASE_CANVAS_WIDTH;
@@ -198,13 +222,13 @@ const COLORS = {
   watcher: "#7ed7ff"
 };
 
-const SAVE_KEY = "shadow-shift-web-save";
-
 const state = createInitialState();
 initializeStateRuntime(state);
 applyPersistedProgress(state);
 
 function initializeStateRuntime(targetState) {
+  initializeEntityRegistry(targetState);
+  initializePlayerRuntime(targetState.player);
   targetState.player.maxHp = targetState.player.maxHp ?? targetState.player.hp;
   targetState.player.displayHp = targetState.player.maxHp;
   for (const enemy of targetState.enemies) {
@@ -214,6 +238,101 @@ function initializeStateRuntime(targetState) {
     enemy.reactionType = enemy.reactionType ?? "none";
     initializeEnemyRuntime(enemy);
   }
+}
+
+function initializeEntityRegistry(targetState) {
+  targetState.entities = createEntityRegistry();
+
+  targetState.entities.register("pickup", targetState.pickups.dash, {
+    trigger: true,
+    reward: "Dash"
+  });
+  targetState.entities.register("pickup", targetState.pickups.weapon, {
+    trigger: true,
+    reward: "WeaponStage"
+  });
+
+  for (const checkpoint of targetState.checkpoints) {
+    targetState.entities.register("checkpoint", checkpoint, {
+      trigger: true,
+      checkpointId: checkpoint.id
+    });
+  }
+
+  for (const hazard of targetState.hazards ?? []) {
+    targetState.entities.register("hazard", hazard, {
+      damage: hazard.damage ?? 1,
+      kind: hazard.kind ?? "hazard"
+    });
+  }
+}
+
+function getRoomById(targetState, roomId) {
+  return targetState.rooms.find((room) => room.id === roomId) ?? targetState.rooms[0];
+}
+
+function getRoomForX(targetState, x) {
+  return targetState.rooms.find((room) => x >= room.bounds.x && x < room.bounds.x + room.bounds.w) ?? targetState.rooms[targetState.rooms.length - 1];
+}
+
+function exitRoom(targetState, roomId) {
+  const room = getRoomById(targetState, roomId);
+  targetState.activeCheckpointId = room.spawnCheckpointId ?? targetState.activeCheckpointId;
+}
+
+function enterRoom(targetState, roomId) {
+  const room = getRoomById(targetState, roomId);
+  targetState.currentRoomId = room.id;
+  targetState.roomState.visitedRooms[room.id] = true;
+  if (targetState === state && targetState.started && !targetState.gameWon && !targetState.isDead) {
+    showMessage(`${room.label}${room.objectiveHint ? `: ${room.objectiveHint}` : ""}`, 2.1);
+  }
+}
+
+function updateCurrentRoom(targetState, player) {
+  const room = getRoomForX(targetState, player.x + player.w * 0.5);
+  if (targetState.currentRoomId !== room.id) {
+    exitRoom(targetState, targetState.currentRoomId);
+    enterRoom(targetState, room.id);
+    return;
+  }
+  targetState.currentRoomId = room.id;
+}
+
+function getCurrentRoom(targetState) {
+  return getRoomById(targetState, targetState.currentRoomId);
+}
+
+function getRoomEntities(targetState, roomId) {
+  return {
+    pickups: Object.values(targetState.pickups).filter((pickup) => pickup.roomId === roomId),
+    checkpoints: targetState.checkpoints.filter((checkpoint) => checkpoint.roomId === roomId),
+    blockers: [targetState.gate, targetState.barrier].filter((entry) => entry.roomId === roomId),
+    exitZone: targetState.exitZone.roomId === roomId ? targetState.exitZone : null
+  };
+}
+
+function initializePlayerRuntime(player) {
+  player.actionState = player.actionState ?? "idle";
+  player.actionStateTimer = player.actionStateTimer ?? 0;
+  if (player.actionStateMachine) {
+    return;
+  }
+
+  player.actionStateMachine = createStateMachine({
+    owner: player,
+    initialState: player.actionState,
+    states: createTimedStateDefinitions([
+      "idle",
+      "run",
+      "jump",
+      "fall",
+      "dash",
+      "attack",
+      "hurt",
+      "dead"
+    ], "actionState", "actionStateTimer")
+  });
 }
 
 function initializeEnemyRuntime(enemy) {
@@ -231,18 +350,159 @@ function initializeEnemyRuntime(enemy) {
   enemy.accel = enemy.accel != null ? enemy.accel : moveTuning.accel;
   enemy.decel = enemy.decel != null ? enemy.decel : moveTuning.decel;
   enemy.turnSpeed = enemy.turnSpeed != null ? enemy.turnSpeed : moveTuning.turnSpeed;
+  if (enemy.boss && !enemy.bossController) {
+    enemy.bossController = createBossController({
+      initialPhase: "phase-1",
+      introWakeX: 2860,
+      phaseThresholds: [
+        { id: "phase-1", hpRatio: 1 },
+        { id: "phase-2", hpRatio: 0.55 }
+      ],
+      attackCatalog: createBossAttackCatalog(enemy)
+    });
+  }
+  if (!enemy.aiStateMachine) {
+    enemy.aiStateMachine = createStateMachine({
+      owner: enemy,
+      initialState: enemy.state,
+      states: createTimedStateDefinitions([
+        "idle",
+        "patrol",
+        "windup",
+        "burst",
+        "recover",
+        "stagger"
+      ], "state", "stateTimer")
+    });
+  }
+}
+
+function createBossAttackCatalog(enemy) {
+  if (enemy.type !== "oracle") {
+    return [];
+  }
+
+  return [
+    {
+      id: "oracle-blink-strike",
+      phase: "phase-1",
+      canUse: (context) => context.horizontalDistance < 380,
+      score: (context) => context.horizontalDistance < 220 ? 2.2 : 1.3,
+      buildAction: (context) => ({
+        windup: 0.28,
+        action: {
+          type: "blink",
+          offset: context.facingToPlayer * 120,
+          travelTime: 0.1,
+          burstTime: 0.22,
+          speed: 220,
+          cooldown: 1.45,
+          recoveryTime: 0.22
+        }
+      })
+    },
+    {
+      id: "oracle-phase2-cross",
+      phase: "phase-2",
+      canUse: (context) => context.horizontalDistance < 430,
+      score: (context) => context.horizontalDistance > 200 ? 2.4 : 1.7,
+      buildAction: (context) => ({
+        windup: 0.18,
+        action: {
+          type: "blink",
+          offset: context.facingToPlayer * clamp(context.horizontalDistance * 0.55, 120, 180),
+          travelTime: 0.08,
+          burstTime: 0.3,
+          speed: 260,
+          cooldown: 1.15,
+          recoveryTime: 0.18
+        }
+      })
+    },
+    {
+      id: "oracle-phase2-rush",
+      phase: "phase-2",
+      canUse: (context) => context.horizontalDistance >= 160,
+      score: (context) => context.horizontalDistance >= 280 ? 2.6 : 1.2,
+      buildAction: (context) => ({
+        windup: 0.2,
+        action: {
+          type: "burst",
+          burstTime: 0.34,
+          speed: 295,
+          cooldown: 1.3,
+          recoveryTime: 0.2
+        }
+      })
+    }
+  ];
 }
 
 function getEnemyState(enemy) {
-  return enemy.state ?? "patrol";
+  if (!enemy.aiStateMachine) {
+    initializeEnemyRuntime(enemy);
+  }
+  return enemy.aiStateMachine.current ?? enemy.state ?? "patrol";
 }
 
 function setEnemyState(enemy, nextState, stateTime = 0) {
-  if (enemy.state == null) {
+  if (enemy.state == null || !enemy.aiStateMachine) {
     initializeEnemyRuntime(enemy);
   }
-  enemy.state = nextState;
-  enemy.stateTimer = stateTime;
+  const payload = { duration: stateTime };
+  if (enemy.aiStateMachine.current === nextState) {
+    enemy.aiStateMachine.force(nextState, payload);
+    return;
+  }
+  if (!enemy.aiStateMachine.transition(nextState, payload)) {
+    enemy.aiStateMachine.force(nextState, payload);
+  }
+}
+
+function createTimedStateDefinitions(stateNames, labelField, timerField) {
+  const definitions = {};
+  for (const stateName of stateNames) {
+    definitions[stateName] = {
+      enter(owner, _previousState, payload = {}) {
+        owner[labelField] = stateName;
+        owner[timerField] = payload.duration ?? 0;
+      }
+    };
+  }
+  return definitions;
+}
+
+function syncPlayerActionState(player) {
+  if (!player.actionStateMachine) {
+    initializePlayerRuntime(player);
+  }
+
+  const nextState = resolvePlayerActionState(player);
+  if (player.actionStateMachine.current !== nextState) {
+    player.actionStateMachine.transition(nextState);
+  }
+}
+
+function resolvePlayerActionState(player) {
+  if (state.isDead) {
+    return "dead";
+  }
+  if (player.hurtFlash > 0.16 && player.invuln > 0) {
+    return "hurt";
+  }
+  if (player.dashTimer > 0) {
+    return "dash";
+  }
+  if (player.attackTimer > 0 || player.attackRecover > 0) {
+    return "attack";
+  }
+  if (!player.onGround) {
+    return player.vy < 0 ? "jump" : "fall";
+  }
+  if (Math.abs(player.vx) > 30) {
+    return "run";
+  }
+  return "idle";
 }
 
 function getEnemyMoveSettings(enemy) {
@@ -423,6 +683,52 @@ function createInitialState() {
     started: false,
     gameWon: false,
     isDead: false,
+    debug: {
+      showStateLabels: false,
+      showCombatBoxes: false,
+      showRequirements: false,
+      showSaveState: false
+    },
+    rooms: [
+      {
+        id: "outer-rampart",
+        bounds: { x: 0, y: 0, w: 1280, h: BASE_CANVAS_HEIGHT },
+        theme: "rampart",
+        spawnCheckpointId: "start",
+        label: "Outer Rampart",
+        objectiveHint: "Reach the Dash Core"
+      },
+      {
+        id: "ash-gate",
+        bounds: { x: 1280, y: 0, w: 1280, h: BASE_CANVAS_HEIGHT },
+        theme: "ash",
+        spawnCheckpointId: "gate",
+        label: "Ash Gate",
+        objectiveHint: "Break through the sealed path"
+      },
+      {
+        id: "umbral-galleries",
+        bounds: { x: 2560, y: 0, w: 860, h: BASE_CANVAS_HEIGHT },
+        theme: "galleries",
+        spawnCheckpointId: "sanctum",
+        label: "Umbral Galleries",
+        objectiveHint: "Claim the weapon upgrade"
+      },
+      {
+        id: "eclipse-throne",
+        bounds: { x: 3420, y: 0, w: 620, h: BASE_CANVAS_HEIGHT },
+        theme: "boss",
+        spawnCheckpointId: "boss",
+        label: "Eclipse Throne",
+        objectiveHint: "Defeat the Eclipse Lord"
+      }
+    ],
+    currentRoomId: "outer-rampart",
+    roomState: {
+      visitedRooms: {
+        "outer-rampart": true
+      }
+    },
     bossIntroShown: false,
     debugInvulnerable: false,
     activeCheckpointId: "start",
@@ -443,23 +749,33 @@ function createInitialState() {
       vx: 0,
       vy: 0,
       facing: 1,
+      moveAxis: 0,
       onGround: false,
       onWall: false,
+      wallSliding: false,
       wallDirection: 0,
-      moveSpeed: 320,
-      jumpForce: 760,
-      dashSpeed: 760,
-      dashDuration: 0.14,
+      lastWallDirection: 0,
+      wallJumpGraceTimer: 0,
+      moveSpeed: BASE_MOVEMENT_TUNING.moveSpeed,
+      jumpForce: BASE_MOVEMENT_TUNING.jumpForce,
+      dashSpeed: BASE_MOVEMENT_TUNING.dashSpeed,
+      dashDuration: BASE_MOVEMENT_TUNING.dashDuration,
       dashTimer: 0,
       dashCooldown: 0,
-      dashCooldownDuration: 0.35,
+      dashCooldownDuration: BASE_MOVEMENT_TUNING.dashCooldownDuration,
       coyoteTimer: 0,
       jumpBufferTimer: 0,
-      wallSlideSpeed: 170,
+      wallSlideSpeed: BASE_MOVEMENT_TUNING.wallSlideSpeed,
       wallJumpLock: 0,
       jumpReleased: false,
       jumpCutReady: false,
-      jumpCutMultiplier: 0.48,
+      jumpCutMultiplier: BASE_MOVEMENT_TUNING.jumpCutMultiplier,
+      traversalUpgrades: {
+        doubleJump: false,
+        glide: false,
+        phaseStep: false,
+        grapple: false
+      },
       hp: 5,
       maxHp: 5,
       displayHp: 5,
@@ -651,14 +967,14 @@ function createInitialState() {
       }
     ],
     pickups: {
-      dash: { x: 880, y: 574, w: 28, h: 28, active: true, label: "Dash Core" },
-      weapon: { x: 2580, y: 354, w: 28, h: 28, active: true, label: "Umbral Fang" }
+      dash: { x: 880, y: 574, w: 28, h: 28, active: true, label: "Dash Core", roomId: "outer-rampart" },
+      weapon: { x: 2580, y: 354, w: 28, h: 28, active: true, label: "Umbral Fang", roomId: "umbral-galleries" }
     },
     checkpoints: [
-      { id: "start", x: 120, y: 540, w: 28, h: 72, label: "Outer Rampart", active: true },
-      { id: "gate", x: 1120, y: 548, w: 28, h: 72, label: "Ash Gate", active: false },
-      { id: "sanctum", x: 2540, y: 338, w: 28, h: 72, label: "Umbral Galleries", active: false },
-      { id: "boss", x: 3460, y: 548, w: 28, h: 72, label: "Eclipse Throne", active: false }
+      { id: "start", x: 120, y: 540, w: 28, h: 72, label: "Outer Rampart", active: true, roomId: "outer-rampart" },
+      { id: "gate", x: 1120, y: 548, w: 28, h: 72, label: "Ash Gate", active: false, roomId: "outer-rampart" },
+      { id: "sanctum", x: 2540, y: 338, w: 28, h: 72, label: "Umbral Galleries", active: false, roomId: "umbral-galleries" },
+      { id: "boss", x: 3460, y: 548, w: 28, h: 72, label: "Eclipse Throne", active: false, roomId: "eclipse-throne" }
     ],
     gate: {
       x: 1030,
@@ -666,20 +982,35 @@ function createInitialState() {
       w: 34,
       h: 160,
       active: true,
-      requiredAbility: "Dash"
+      roomId: "outer-rampart",
+      requirements: {
+        abilities: ["Dash"]
+      },
+      failureMessage: "The path is sealed without Dash"
     },
     barrier: {
       x: 2280,
       y: 520,
       w: 40,
       h: 100,
-      active: true
+      active: true,
+      roomId: "ash-gate",
+      requirements: {
+        element: "Fire"
+      },
+      failureMessage: "Fire is needed here"
     },
     exitZone: {
       x: 3960,
       y: 430,
       w: 60,
-      h: 190
+      h: 190,
+      roomId: "eclipse-throne",
+      requirements: {
+        anyOf: [
+          { abilities: ["Dash"] }
+        ]
+      }
     },
     platforms: [
       { x: 0, y: 620, w: 420, h: 100, type: "ground" },
@@ -739,9 +1070,34 @@ function createInitialState() {
 
 function getDefaultProgress() {
   return {
-    dashUnlocked: false,
-    weaponStage: 0,
-    checkpointId: "start"
+    version: 2,
+    progression: {
+      abilities: {
+        Dash: false
+      },
+      elements: {
+        FireShift: true,
+        IceShift: true,
+        WindShift: true,
+        ShadowSwap: true
+      }
+    },
+    upgrades: {
+      weaponStage: 0
+    },
+    checkpoint: {
+      id: "start",
+      roomId: "outer-rampart"
+    },
+    roomFlags: {
+      visitedRooms: {
+        "outer-rampart": true
+      },
+      pickups: {
+        dashCollected: false,
+        weaponCollected: false
+      }
+    }
   };
 }
 
@@ -752,23 +1108,109 @@ function loadProgress() {
       return getDefaultProgress();
     }
     const parsed = JSON.parse(raw);
+    if (parsed.version === 2) {
+      return {
+        version: 2,
+        progression: {
+          abilities: {
+            Dash: Boolean(parsed.progression?.abilities?.Dash)
+          },
+          elements: {
+            FireShift: parsed.progression?.elements?.FireShift !== false,
+            IceShift: parsed.progression?.elements?.IceShift !== false,
+            WindShift: parsed.progression?.elements?.WindShift !== false,
+            ShadowSwap: parsed.progression?.elements?.ShadowSwap !== false
+          }
+        },
+        upgrades: {
+          weaponStage: parsed.upgrades?.weaponStage >= 1 ? 1 : 0
+        },
+        checkpoint: {
+          id: typeof parsed.checkpoint?.id === "string" ? parsed.checkpoint.id : "start",
+          roomId: typeof parsed.checkpoint?.roomId === "string" ? parsed.checkpoint.roomId : "outer-rampart"
+        },
+        roomFlags: {
+          visitedRooms: typeof parsed.roomFlags?.visitedRooms === "object" && parsed.roomFlags?.visitedRooms
+            ? parsed.roomFlags.visitedRooms
+            : { "outer-rampart": true },
+          pickups: {
+            dashCollected: Boolean(parsed.roomFlags?.pickups?.dashCollected),
+            weaponCollected: Boolean(parsed.roomFlags?.pickups?.weaponCollected)
+          }
+        }
+      };
+    }
+
     return {
-      dashUnlocked: Boolean(parsed.dashUnlocked),
-      weaponStage: parsed.weaponStage >= 1 ? 1 : 0,
-      checkpointId: typeof parsed.checkpointId === "string" ? parsed.checkpointId : "start"
+      version: 2,
+      progression: {
+        abilities: {
+          Dash: Boolean(parsed.dashUnlocked)
+        },
+        elements: {
+          FireShift: true,
+          IceShift: true,
+          WindShift: true,
+          ShadowSwap: true
+        }
+      },
+      upgrades: {
+        weaponStage: parsed.weaponStage >= 1 ? 1 : 0
+      },
+      checkpoint: {
+        id: typeof parsed.checkpointId === "string" ? parsed.checkpointId : "start",
+        roomId: getCheckpointById(state, typeof parsed.checkpointId === "string" ? parsed.checkpointId : "start").roomId ?? "outer-rampart"
+      },
+      roomFlags: {
+        visitedRooms: {
+          "outer-rampart": true
+        },
+        pickups: {
+          dashCollected: Boolean(parsed.dashUnlocked),
+          weaponCollected: parsed.weaponStage >= 1
+        }
+      }
     };
   } catch (_error) {
     return getDefaultProgress();
   }
 }
 
+function getSavePayload(targetState) {
+  const checkpoint = getCheckpointById(targetState, targetState.savedCheckpointId);
+  return {
+    version: 2,
+    progression: {
+      abilities: {
+        Dash: targetState.abilityUnlocked.Dash
+      },
+      elements: {
+        FireShift: targetState.abilityUnlocked.FireShift,
+        IceShift: targetState.abilityUnlocked.IceShift,
+        WindShift: targetState.abilityUnlocked.WindShift,
+        ShadowSwap: targetState.abilityUnlocked.ShadowSwap
+      }
+    },
+    upgrades: {
+      weaponStage: targetState.player.weaponStage
+    },
+    checkpoint: {
+      id: targetState.savedCheckpointId,
+      roomId: checkpoint.roomId ?? targetState.currentRoomId
+    },
+    roomFlags: {
+      visitedRooms: targetState.roomState.visitedRooms,
+      pickups: {
+        dashCollected: !targetState.pickups.dash.active,
+        weaponCollected: !targetState.pickups.weapon.active
+      }
+    }
+  };
+}
+
 function saveProgress() {
   try {
-    const payload = {
-      dashUnlocked: state.abilityUnlocked.Dash,
-      weaponStage: state.player.weaponStage,
-      checkpointId: state.savedCheckpointId
-    };
+    const payload = getSavePayload(state);
     window.localStorage.setItem(SAVE_KEY, JSON.stringify(payload));
   } catch (_error) {
     // Ignore storage failures so the prototype remains playable in restricted contexts.
@@ -777,12 +1219,17 @@ function saveProgress() {
 
 function applyPersistedProgress(targetState) {
   const progress = loadProgress();
-  targetState.abilityUnlocked.Dash = progress.dashUnlocked;
-  targetState.player.weaponStage = progress.weaponStage;
-  targetState.pickups.dash.active = !progress.dashUnlocked;
-  targetState.pickups.weapon.active = progress.weaponStage < 1;
-  setSavedCheckpoint(targetState, progress.checkpointId, false);
-  spawnPlayerAtCheckpoint(targetState, targetState.player, "start");
+  targetState.abilityUnlocked.Dash = progress.progression.abilities.Dash;
+  targetState.abilityUnlocked.FireShift = progress.progression.elements.FireShift;
+  targetState.abilityUnlocked.IceShift = progress.progression.elements.IceShift;
+  targetState.abilityUnlocked.WindShift = progress.progression.elements.WindShift;
+  targetState.abilityUnlocked.ShadowSwap = progress.progression.elements.ShadowSwap;
+  targetState.player.weaponStage = progress.upgrades.weaponStage;
+  targetState.pickups.dash.active = !progress.roomFlags.pickups.dashCollected;
+  targetState.pickups.weapon.active = !progress.roomFlags.pickups.weaponCollected;
+  targetState.roomState.visitedRooms = progress.roomFlags.visitedRooms ?? { "outer-rampart": true };
+  setSavedCheckpoint(targetState, progress.checkpoint.id, false);
+  spawnPlayerAtCheckpoint(targetState, targetState.player, progress.checkpoint.id);
 }
 
 function setSavedCheckpoint(targetState, checkpointId, shouldSave = true) {
@@ -810,13 +1257,15 @@ function spawnPlayerAtCheckpoint(targetState, player, checkpointId) {
   player.y = checkpoint.y - 8;
   player.vx = 0;
   player.vy = 0;
+  updateCurrentRoom(targetState, player);
 }
 
 function handleKeyDown(code) {
   const player = state.player;
+  const movement = getMovementTuning(state, player);
 
   if (code === "Space") {
-    player.jumpBufferTimer = 0.16;
+    player.jumpBufferTimer = movement.jumpBufferTime;
   }
 
   if ((code === "ShiftLeft" || code === "ShiftRight") && state.abilityUnlocked.Dash) {
@@ -840,6 +1289,26 @@ function handleKeyDown(code) {
     toggleInvulnerability();
   }
 
+  if (code === "KeyO") {
+    state.debug.showStateLabels = !state.debug.showStateLabels;
+    showMessage(`State overlay ${state.debug.showStateLabels ? "enabled" : "disabled"}`);
+  }
+
+  if (code === "KeyP") {
+    state.debug.showCombatBoxes = !state.debug.showCombatBoxes;
+    showMessage(`Combat boxes ${state.debug.showCombatBoxes ? "enabled" : "disabled"}`);
+  }
+
+  if (code === "BracketLeft") {
+    state.debug.showRequirements = !state.debug.showRequirements;
+    showMessage(`Requirement overlay ${state.debug.showRequirements ? "enabled" : "disabled"}`);
+  }
+
+  if (code === "BracketRight") {
+    state.debug.showSaveState = !state.debug.showSaveState;
+    showMessage(`Save overlay ${state.debug.showSaveState ? "enabled" : "disabled"}`);
+  }
+
   if (code === "Digit1" && state.abilityUnlocked.FireShift) {
     state.element = "Fire";
   }
@@ -858,9 +1327,10 @@ function handleKeyDown(code) {
 
 function handleTouchAction(action) {
   const player = state.player;
+  const movement = getMovementTuning(state, player);
 
   if (action === "jump") {
-    player.jumpBufferTimer = 0.16;
+    player.jumpBufferTimer = movement.jumpBufferTime;
     return;
   }
 
@@ -1020,14 +1490,28 @@ function respawnFromSavedCheckpoint(message = "The warrior rises again") {
 
 function tryDash() {
   const player = state.player;
-  if (player.dashCooldown > 0 || player.dashTimer > 0) {
+  const movement = getMovementTuning(state, player);
+  if (!canStartDash(player)) {
     return;
   }
 
-  player.dashTimer = player.dashDuration;
-  player.dashCooldown = player.dashCooldownDuration;
-  player.vx = player.facing * player.dashSpeed;
+  startDash(player, movement);
+}
+
+function canStartDash(player) {
+  return player.dashCooldown <= 0 && player.dashTimer <= 0;
+}
+
+function startDash(player, movement = getMovementTuning(state, player)) {
+  player.dashTimer = movement.dashDuration;
+  player.dashCooldown = movement.dashCooldownDuration;
+  player.vx = player.facing * movement.dashSpeed;
   player.vy = 0;
+  player.wallSliding = false;
+  player.wallJumpGraceTimer = 0;
+  player.jumpCutReady = false;
+  spawnImpactParticles(player.x + player.w * 0.5, player.y + player.h * 0.58, "#d8ecff", 5, 0.55);
+  applyScreenShake(0.05, 1.4);
   showMessage("Dash");
 }
 
@@ -1036,12 +1520,99 @@ function getVerticalAim() {
     - (keys.has("KeyW") || keys.has("ArrowUp") ? 1 : 0);
 }
 
+const COMBO_ATTACK_DEFINITIONS = [
+  {
+    id: "combo-1",
+    damageBonus: 0,
+    widthBonus: 0,
+    height: 44,
+    offsetY: 12,
+    startup: 0.1,
+    activeTime: 0.1,
+    cooldown: 0.2,
+    recovery: 0.11,
+    movementImpulse: 90,
+    knockback: 240,
+    comboWindow: 0.3,
+    queueWindow: 0.09,
+    finisher: false,
+    hitTag: "light"
+  },
+  {
+    id: "combo-2",
+    damageBonus: 0,
+    widthBonus: 10,
+    height: 46,
+    offsetY: 10,
+    startup: 0.11,
+    activeTime: 0.11,
+    cooldown: 0.19,
+    recovery: 0.12,
+    movementImpulse: 110,
+    knockback: 285,
+    comboWindow: 0.28,
+    queueWindow: 0.085,
+    finisher: false,
+    hitTag: "heavy"
+  },
+  {
+    id: "combo-3",
+    damageBonus: 1,
+    widthBonus: 22,
+    height: 50,
+    offsetY: 8,
+    startup: 0.13,
+    activeTime: 0.13,
+    cooldown: 0.28,
+    recovery: 0.16,
+    movementImpulse: 135,
+    knockback: 360,
+    comboWindow: 0,
+    queueWindow: 0,
+    finisher: true,
+    hitTag: "finisher"
+  }
+];
+
+function getComboAttackDefinitions() {
+  return COMBO_ATTACK_DEFINITIONS;
+}
+
+function getNextComboIndex(player) {
+  return player.comboChainTimer > 0 ? Math.min(player.comboStep + 1, getComboAttackDefinitions().length - 1) : 0;
+}
+
+function buildComboAttackProfile(player, definition, comboIndex) {
+  const attackWidth = getAttackWidth();
+  return {
+    id: definition.id,
+    type: "combo",
+    comboIndex,
+    damageBonus: definition.damageBonus,
+    width: attackWidth + definition.widthBonus,
+    height: definition.height,
+    offsetX: player.facing > 0 ? player.w : -(attackWidth + definition.widthBonus),
+    offsetY: definition.offsetY,
+    startup: definition.startup,
+    attackTime: definition.activeTime,
+    cooldown: definition.cooldown,
+    recover: definition.recovery,
+    forwardBoost: definition.movementImpulse,
+    knockback: definition.knockback,
+    comboWindow: definition.comboWindow,
+    queueWindow: definition.queueWindow,
+    finisher: definition.finisher,
+    hitTag: definition.hitTag,
+    slashColor: state.element === "Fire" ? "#ffb388" : state.element === "Ice" ? "#bfefff" : "#f5eee2"
+  };
+}
+
 // Attack profiles keep combo/pogo tuning centralized and easy to iterate on.
 function getAttackProfile(player, mode = "auto") {
   const isDownslash = mode === "downslash" || (mode === "auto" && !player.onGround && getVerticalAim() > 0);
-  const attackWidth = getAttackWidth();
 
   if (isDownslash) {
+    const attackWidth = getAttackWidth();
     return {
       id: "downslash",
       type: "downslash",
@@ -1057,41 +1628,23 @@ function getAttackProfile(player, mode = "auto") {
       knockback: 180,
       comboWindow: 0,
       queueWindow: 0,
-      bounceStrength: 590,
+      bounceStrength: getMovementTuning(state, player).pogoBounceStrength,
       slashColor: state.element === "Fire" ? "#ffbf90" : state.element === "Ice" ? "#c9f3ff" : "#f2f0ea"
     };
   }
 
-  const comboIndex = player.comboChainTimer > 0 ? Math.min(player.comboStep + 1, 2) : 0;
-  const comboProfiles = [
-    { id: "combo-1", damageBonus: 0, width: attackWidth, height: 44, offsetX: null, offsetY: 12, attackTime: 0.1, cooldown: 0.2, recover: 0.11, forwardBoost: 90, knockback: 240, comboWindow: 0.3, queueWindow: 0.09, finisher: false },
-    { id: "combo-2", damageBonus: 0, width: attackWidth + 10, height: 46, offsetX: null, offsetY: 10, attackTime: 0.11, cooldown: 0.19, recover: 0.12, forwardBoost: 110, knockback: 285, comboWindow: 0.28, queueWindow: 0.085, finisher: false },
-    { id: "combo-3", damageBonus: 1, width: attackWidth + 22, height: 50, offsetX: null, offsetY: 8, attackTime: 0.13, cooldown: 0.28, recover: 0.16, forwardBoost: 135, knockback: 360, comboWindow: 0, queueWindow: 0, finisher: true }
-  ];
-  const profile = { ...comboProfiles[comboIndex] };
-  profile.type = "combo";
-  profile.comboIndex = comboIndex;
-  profile.offsetX = player.facing > 0 ? player.w : -profile.width;
-  profile.slashColor = state.element === "Fire" ? "#ffb388" : state.element === "Ice" ? "#bfefff" : "#f5eee2";
-  return profile;
+  const comboIndex = getNextComboIndex(player);
+  const definition = getComboAttackDefinitions()[comboIndex];
+  return buildComboAttackProfile(player, definition, comboIndex);
 }
 
 function getAttackProfileById(player, profileId) {
   if (profileId === "downslash") {
     return getAttackProfile(player, "downslash");
   }
-  const comboProfiles = [
-    { id: "combo-1", damageBonus: 0, width: getAttackWidth(), height: 44, offsetY: 12 },
-    { id: "combo-2", damageBonus: 0, width: getAttackWidth() + 10, height: 46, offsetY: 10 },
-    { id: "combo-3", damageBonus: 1, width: getAttackWidth() + 22, height: 50, offsetY: 8 }
-  ];
-  const profile = comboProfiles.find((entry) => entry.id === profileId) ?? comboProfiles[0];
-  return {
-    ...profile,
-    type: "combo",
-    offsetX: player.facing > 0 ? player.w : -profile.width,
-    slashColor: state.element === "Fire" ? "#ffb388" : state.element === "Ice" ? "#bfefff" : "#f5eee2"
-  };
+  const definitions = getComboAttackDefinitions();
+  const comboIndex = Math.max(0, definitions.findIndex((entry) => entry.id === profileId));
+  return buildComboAttackProfile(player, definitions[comboIndex], comboIndex);
 }
 
 function getCurrentAttackBox(player, profile) {
@@ -1103,9 +1656,84 @@ function getCurrentAttackBox(player, profile) {
   };
 }
 
+function getEnemyHurtbox(enemy) {
+  return createHurtbox("enemy", enemy.name, enemy, "enemy");
+}
+
+function createPlayerAttackHitbox(player, profile, attackBox) {
+  const hitTag = profile.type === "downslash" ? "pogo" : (profile.hitTag ?? (profile.comboIndex >= 1 ? "heavy" : "light"));
+  return createHitbox({
+    ownerType: "player",
+    ownerId: "shadow-warrior",
+    team: "player",
+    x: attackBox.x,
+    y: attackBox.y,
+    w: attackBox.w,
+    h: attackBox.h,
+    lifetime: profile.attackTime,
+    damage: getAttackDamage(profile),
+    knockbackX: profile.type === "downslash" ? player.facing * 140 : player.facing * profile.knockback,
+    knockbackTime: profile.finisher ? 0.22 : profile.type === "downslash" ? 0.18 : 0.16,
+    staggerTime: profile.finisher ? 0.22 : profile.type === "downslash" ? 0.18 : 0.14,
+    impactPower: getImpactPowerForHit({ hitTag }),
+    hitTag,
+    element: state.element,
+    profileId: profile.id
+  });
+}
+
+function applyEnemyHit(enemy, hitbox) {
+  const impact = getEnemyImpactTuning(enemy);
+  const damage = hitbox.damage;
+  const reactionType = getReactionTypeFromHit(hitbox);
+  const reactionDuration = getReactionDuration(reactionType);
+  const impactPower = hitbox.impactPower ?? getImpactPowerForHit(hitbox);
+  const knockbackScale = impact.knockbackScale / Math.max(0.65, impact.weight);
+  const knockbackX = hitbox.knockbackX * knockbackScale;
+  const staggerTime = hitbox.staggerTime * impact.staggerScale;
+  const shouldStagger = impactPower >= impact.staggerThreshold || reactionType === "finisher";
+
+  enemy.hp = Math.max(0, enemy.hp - damage);
+  enemy.invuln = 0.16;
+  enemy.hurtTimer = reactionType === "finisher" ? 0.26 : reactionType === "pogo" ? 0.22 : 0.2;
+  enemy.knockbackTimer = hitbox.knockbackTime;
+  enemy.vx = knockbackX;
+  enemy.targetVx = 0;
+  enemy.reactionTimer = reactionDuration;
+  enemy.reactionType = reactionType;
+  enemy.lastHitElement = hitbox.element;
+  enemy.lastImpactPower = impactPower;
+  enemy.lastKnockbackX = knockbackX;
+  enemy.staggeredByLastHit = shouldStagger;
+  if (shouldStagger) {
+    beginEnemyStagger(enemy, Math.max(0.08, staggerTime));
+  }
+
+  return {
+    damage,
+    reactionType,
+    impactPower,
+    shouldStagger,
+    hitstopBonus: impact.hitstopBonus ?? 0,
+    defeated: enemy.hp <= 0
+  };
+}
+
 function canQueueComboAttack(player) {
   const profile = getAttackProfile(player, "normal");
   return player.attackType === "combo" && player.comboChainTimer > 0 && player.attackCooldown <= profile.queueWindow;
+}
+
+function commitAttackProfile(player, profile) {
+  player.attackType = profile.type;
+  player.attackProfileId = profile.id;
+  player.attackCooldown = profile.cooldown;
+  player.attackTimer = profile.attackTime;
+  player.attackRecover = profile.recover;
+  player.queuedAttack = false;
+  player.comboChainTimer = profile.comboWindow;
+  player.comboStep = profile.type === "combo" ? profile.comboIndex : -1;
+  player.vx += player.facing * profile.forwardBoost;
 }
 
 function tryAttack(mode = "auto") {
@@ -1118,46 +1746,33 @@ function tryAttack(mode = "auto") {
   }
 
   const profile = getAttackProfile(player, mode);
-  player.attackType = profile.type;
-  player.attackProfileId = profile.id;
-  player.attackCooldown = profile.cooldown;
-  player.attackTimer = profile.attackTime;
-  player.attackRecover = profile.recover;
-  player.queuedAttack = false;
-  player.comboChainTimer = profile.comboWindow;
-  player.comboStep = profile.type === "combo" ? profile.comboIndex : -1;
-  player.vx += player.facing * profile.forwardBoost;
+  commitAttackProfile(player, profile);
   playAttackSound();
 
   const attackBox = getCurrentAttackBox(player, profile);
+  const attackHitbox = createPlayerAttackHitbox(player, profile, attackBox);
   spawnSlashTrail(attackBox, profile.type === "downslash" ? 1 : player.facing, profile.slashColor, profile.type);
 
   let landedHit = false;
-  let pogoHit = false;
+  let pogoTarget = null;
 
   for (const enemy of state.enemies) {
-    if (!enemy.alive || !overlaps(attackBox, enemy) || enemy.invuln > 0) {
+    const hurtbox = getEnemyHurtbox(enemy);
+    if (!enemy.alive || !overlapsHitbox(attackHitbox, hurtbox) || enemy.invuln > 0) {
       continue;
     }
 
-    const damage = getAttackDamage(profile);
     landedHit = true;
-    enemy.hp = Math.max(0, enemy.hp - damage);
-    enemy.invuln = 0.16;
-    enemy.hurtTimer = 0.22;
-    enemy.knockbackTimer = profile.finisher ? 0.22 : profile.type === "downslash" ? 0.18 : 0.16;
-    enemy.vx = profile.type === "downslash" ? player.facing * 140 : player.facing * (profile.knockback + damage * 24);
-    enemy.targetVx = 0;
-    enemy.reactionTimer = profile.finisher ? 0.24 : profile.type === "downslash" ? 0.2 : 0.16;
-    enemy.reactionType = profile.type === "downslash" ? "pogo" : profile.finisher ? "finisher" : "hit";
-    beginEnemyStagger(enemy, profile.finisher ? (enemy.type === "demon" ? 0.28 : 0.22) : enemy.type === "demon" ? 0.18 : 0.14);
-    applyHitStop(0.055, 6);
+    const result = applyEnemyHit(enemy, attackHitbox);
+    const baseHitStop = result.reactionType === "finisher" ? 0.07 : result.reactionType === "heavy" ? 0.06 : result.reactionType === "pogo" ? 0.05 : 0.045;
+    const shakeStrength = result.reactionType === "finisher" ? 8 : result.reactionType === "heavy" ? 7 : 6;
+    applyHitStop(baseHitStop + result.hitstopBonus, shakeStrength);
     spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.45, profile.slashColor, profile.finisher ? 12 : 8);
-    showMessage(`${enemy.name} hit for ${damage}`);
-    if (profile.type === "downslash") {
-      pogoHit = true;
+    showMessage(`${enemy.name} hit for ${result.damage}${result.shouldStagger ? " and staggered" : ""}`);
+    if (isPogoAttackProfile(profile) && !pogoTarget) {
+      pogoTarget = createPogoTarget("enemy", enemy);
     }
-    if (enemy.hp <= 0) {
+    if (result.defeated) {
       enemy.alive = false;
       applyHitStop(0.07, 8);
       spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.45, "#fff6dc", 12, 1.25);
@@ -1165,36 +1780,33 @@ function tryAttack(mode = "auto") {
     }
   }
 
-  if (state.barrier.active && overlaps(attackBox, state.barrier)) {
-    if (profile.type === "downslash") {
+  if (state.barrier.active && overlapsHitbox(attackBox, state.barrier)) {
+    if (isPogoAttackProfile(profile)) {
       landedHit = true;
-      pogoHit = true;
+      pogoTarget = pogoTarget ?? createPogoTarget("barrier", state.barrier);
       spawnImpactParticles(state.barrier.x + state.barrier.w * 0.5, state.barrier.y + 18, "#f7d8c4", 8, 0.9);
-    } else if (state.element === "Fire") {
+    } else if (meetsRequirements(state.barrier.requirements, state)) {
       state.barrier.active = false;
       landedHit = true;
       applyHitStop(0.045, 5);
       spawnImpactParticles(state.barrier.x + state.barrier.w * 0.5, state.barrier.y + 26, "#ff9f68", 12, 1.1);
       showMessage("Barrier burned away");
     } else {
-      showMessage("Fire is needed here");
+      showMessage(state.barrier.failureMessage);
     }
   }
 
-  if (profile.type === "downslash") {
-    for (const hazard of state.hazards ?? []) {
-      if (!overlaps(attackBox, hazard)) {
-        continue;
-      }
+  if (isPogoAttackProfile(profile)) {
+    const hazardTarget = findPogoHazardTarget(attackBox);
+    if (hazardTarget) {
       landedHit = true;
-      pogoHit = true;
-      spawnImpactParticles(hazard.x + hazard.w * 0.5, hazard.y + 4, "#d8ecff", 8, 0.8);
-      break;
+      pogoTarget = pogoTarget ?? hazardTarget;
+      spawnImpactParticles(hazardTarget.source.x + hazardTarget.source.w * 0.5, hazardTarget.source.y + 4, "#d8ecff", 8, 0.8);
     }
   }
 
-  if (pogoHit) {
-    applyPogoBounce(profile.bounceStrength);
+  if (pogoTarget) {
+    applyPogoBounce(profile.bounceStrength, pogoTarget);
   }
 
   if (!landedHit) {
@@ -1203,15 +1815,50 @@ function tryAttack(mode = "auto") {
   return landedHit;
 }
 
-function applyPogoBounce(strength) {
+function isPogoAttackProfile(profile) {
+  return profile.type === "downslash";
+}
+
+function createPogoTarget(kind, source) {
+  return { kind, source };
+}
+
+function findPogoHazardTarget(attackBox) {
+  for (const entity of state.entities.getByType("hazard")) {
+    const hazard = entity.source;
+    if (overlapsHitbox(attackBox, hazard)) {
+      return createPogoTarget("hazard", hazard);
+    }
+  }
+  return null;
+}
+
+function getPogoBounceStrength(baseStrength, pogoTarget, movement = getMovementTuning(state, state.player)) {
+  if (!pogoTarget) {
+    return baseStrength;
+  }
+
+  if (pogoTarget.kind === "hazard") {
+    return baseStrength * movement.pogoHazardBounceMultiplier;
+  }
+  if (pogoTarget.kind === "barrier") {
+    return baseStrength * movement.pogoBarrierBounceMultiplier;
+  }
+  return baseStrength * movement.pogoEnemyBounceBonus;
+}
+
+function applyPogoBounce(strength, pogoTarget = null) {
   const player = state.player;
-  player.vy = -(state.element === "Wind" ? strength * 1.04 : strength);
+  const movement = getMovementTuning(state, player);
+  const resolvedStrength = getPogoBounceStrength(strength, pogoTarget, movement);
+  player.vy = -(state.element === "Wind" ? resolvedStrength * 1.04 : resolvedStrength);
   player.jumpCutReady = false;
   player.jumpReleased = false;
-  player.pogoGraceTimer = 0.12;
+  player.pogoGraceTimer = movement.pogoHazardGraceTime;
   player.onGround = false;
+  player.wallSliding = false;
   applyHitStop(0.035, 4);
-  spawnImpactParticles(player.x + player.w * 0.5, player.y + player.h, "#f1f6ff", 8, 0.85);
+  spawnImpactParticles(player.x + player.w * 0.5, player.y + player.h, pogoTarget?.kind === "hazard" ? "#d8ecff" : "#f1f6ff", 8, 0.85);
 }
 
 function getAttackDamage(profile = null) {
@@ -1224,7 +1871,19 @@ function getAttackWidth() {
 }
 
 function overlaps(a, b) {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  return aabbOverlap(a, b);
+}
+
+function overlapsTrigger(a, b) {
+  return aabbOverlap(a, b);
+}
+
+function overlapsHitbox(hitbox, hurtbox) {
+  return aabbOverlap(hitbox, hurtbox);
+}
+
+function overlapsHazard(entity, hazard) {
+  return aabbOverlap(entity, hazard);
 }
 
 function applyHitStop(duration, shakeStrength = 0) {
@@ -1304,17 +1963,18 @@ function updateCombatEffects(dt) {
   }
 }
 
-function update(dt) {
-  updateCombatEffects(dt);
+function update(frame) {
+  const frameDt = typeof frame === "number" ? frame : frame.clampedDeltaSeconds;
+  updateCombatEffects(frameDt);
 
   if (!state.started) {
-    updateDisplayValues(dt);
+    updateDisplayValues(frameDt);
     updateHud();
     return;
   }
 
   if (state.combat.hitStop > 0) {
-    updateDisplayValues(dt);
+    updateDisplayValues(frameDt);
     updateHud();
     return;
   }
@@ -1325,25 +1985,42 @@ function update(dt) {
   }
 
   if (state.messageTimer > 0) {
-    state.messageTimer -= dt;
+    state.messageTimer -= frameDt;
     if (state.messageTimer <= 0) {
       hud.overlay.classList.add("hidden");
     }
   }
 
+  const fixedSteps = typeof frame === "number" ? 0 : frame.fixedSteps;
+  const stepDt = typeof frame === "number" ? frameDt : frame.fixedStepSeconds;
+  const simulationSteps = fixedSteps > 0 ? fixedSteps : (frameDt > 0 ? 1 : 0);
+
+  for (let stepIndex = 0; stepIndex < simulationSteps; stepIndex += 1) {
+    updateSimulation(stepDt);
+    if (state.gameWon || state.isDead) {
+      break;
+    }
+  }
+
+  updateCamera(frameDt);
+  updateDisplayValues(frameDt);
+  updateHud();
+}
+
+function updateSimulation(dt) {
   updatePlayer(dt);
+  updateCurrentRoom(state, state.player);
   updateEnemies(dt);
   updateHazards();
   updateCheckpoints();
   updatePickups();
   updateGate();
-  updateCamera(dt);
-  updateDisplayValues(dt);
-  updateHud();
 }
 
 function updatePlayer(dt) {
   const player = state.player;
+  const movement = getMovementTuning(state, player);
+  player.actionStateTimer += dt;
 
   player.coyoteTimer -= dt;
   player.jumpBufferTimer -= dt;
@@ -1355,57 +2032,44 @@ function updatePlayer(dt) {
   player.hurtFlash -= dt;
   player.attackRecover -= dt;
   player.wallJumpLock -= dt;
+  player.wallJumpGraceTimer -= dt;
   player.pogoGraceTimer -= dt;
 
   const moveAxis = getMoveAxis();
+  player.moveAxis = moveAxis;
   if (moveAxis !== 0) {
     player.facing = moveAxis;
   }
 
   if (player.dashTimer > 0) {
     player.dashTimer -= dt;
-  } else {
-    const moveSpeed = state.element === "Wind" ? player.moveSpeed * 1.18 : player.moveSpeed;
-    let targetSpeed = moveAxis * moveSpeed;
-    if (player.attackRecover > 0 && player.wallJumpLock <= 0) {
-      targetSpeed += player.facing * 85;
+    if (player.dashTimer <= 0) {
+      player.vx *= movement.dashEndMomentumMultiplier;
     }
-    player.vx = player.wallJumpLock > 0 ? player.vx : targetSpeed;
-    player.vy += getGravity() * dt;
+  } else {
+    player.vx = resolveHorizontalVelocity(player, movement, moveAxis, dt);
+    player.vy += getPlayerGravity(player, movement) * dt;
+    player.vy = Math.min(player.vy, movement.terminalFallSpeed);
   }
 
-  const jumpPressed = player.jumpBufferTimer > 0;
   const wallData = getWallTouch(player);
-  player.onWall = wallData.touching;
-  player.wallDirection = wallData.direction;
+  updateWallInteractionState(player, wallData, movement);
+  tryConsumeBufferedJump(player, movement);
 
-  if (jumpPressed && player.coyoteTimer > 0) {
-    player.vy = -getJumpForce();
-    player.jumpBufferTimer = 0;
-    player.coyoteTimer = 0;
-    player.onGround = false;
-    player.jumpCutReady = true;
-  } else if (jumpPressed && player.onWall && !player.onGround) {
-    player.vx = -player.wallDirection * 360;
-    player.vy = -getJumpForce() * 0.96;
-    player.jumpBufferTimer = 0;
-    player.wallJumpLock = 0.12;
-    player.jumpCutReady = true;
-    showMessage("Wall jump");
+  if (player.wallSliding) {
+    player.vy = Math.min(player.vy, movement.wallSlideSpeed);
   }
 
-  if (player.onWall && !player.onGround && player.vy > state.player.wallSlideSpeed) {
-    player.vy = state.player.wallSlideSpeed;
-  }
-
-  if (player.jumpReleased && player.jumpCutReady && player.vy < -120) {
-    player.vy *= player.jumpCutMultiplier;
+  if (player.jumpReleased && player.jumpCutReady && player.vy < -movement.jumpCutVelocityGate) {
+    player.vy *= movement.jumpCutMultiplier;
     player.jumpCutReady = false;
   }
   player.jumpReleased = false;
 
   moveHorizontally(player, dt);
   moveVertically(player, dt);
+  player.actionStateMachine.update(dt);
+  syncPlayerActionState(player);
 
   if (player.queuedAttack && player.attackCooldown <= 0.05) {
     tryAttack("normal");
@@ -1427,7 +2091,7 @@ function updatePlayer(dt) {
     showMessage("The Eclipse Lord awakens");
   }
 
-  if (!state.gate.active && !hasBossAlive() && overlaps(player, state.exitZone)) {
+  if (!state.gate.active && !hasBossAlive() && overlapsTrigger(player, state.exitZone)) {
     state.gameWon = true;
     showMessage("Vertical slice cleared", 4);
     showWinOverlay("You broke the Eclipse Lord and survived the fivefold descent into Shadow Shift.");
@@ -1440,26 +2104,95 @@ function getMoveAxis() {
 }
 
 function getJumpForce() {
-  return state.element === "Wind" ? state.player.jumpForce * 1.08 : state.player.jumpForce;
+  return getMovementTuning(state, state.player).jumpForce;
 }
 
 function getGravity() {
-  return state.element === "Wind" ? state.gravity * 0.84 : state.gravity;
+  return getPlayerGravity(state.player);
+}
+
+function getPlayerGravity(player, movement = getMovementTuning(state, player)) {
+  if (player.onGround) {
+    return state.gravity;
+  }
+
+  // Rising stays responsive, the apex softens control briefly, and falling reads faster.
+  if (player.vy < -movement.apexVelocityWindow) {
+    return state.gravity * movement.riseGravityMultiplier;
+  }
+  if (Math.abs(player.vy) <= movement.apexVelocityWindow) {
+    return state.gravity * movement.apexGravityMultiplier;
+  }
+  return state.gravity * movement.fallGravityMultiplier;
+}
+
+function updateWallInteractionState(player, wallData, movement) {
+  player.onWall = wallData.touching && !player.onGround;
+
+  if (player.onWall) {
+    player.wallDirection = wallData.direction;
+    player.lastWallDirection = wallData.direction;
+    player.wallJumpGraceTimer = movement.wallJumpGraceTime;
+  } else if (player.wallJumpGraceTimer <= 0) {
+    player.wallDirection = 0;
+  }
+
+  player.wallSliding = player.onWall
+    && player.wallJumpLock <= 0
+    && player.dashTimer <= 0
+    && player.vy >= movement.wallSlideEntrySpeed;
+}
+
+function tryConsumeBufferedJump(player, movement) {
+  const jumpPressed = player.jumpBufferTimer > 0;
+  if (!jumpPressed) {
+    return false;
+  }
+
+  if (player.coyoteTimer > 0) {
+    performGroundJump(player, movement);
+    return true;
+  }
+
+  if (canWallJump(player)) {
+    performWallJump(player, movement);
+    return true;
+  }
+
+  return false;
+}
+
+function performGroundJump(player, movement) {
+  player.vy = -movement.jumpForce;
+  player.jumpBufferTimer = 0;
+  player.coyoteTimer = 0;
+  player.onGround = false;
+  player.wallSliding = false;
+  player.jumpCutReady = true;
+}
+
+function canWallJump(player) {
+  return !player.onGround && player.wallJumpGraceTimer > 0 && player.lastWallDirection !== 0;
+}
+
+function performWallJump(player, movement) {
+  const jumpDirection = player.wallDirection || player.lastWallDirection;
+  player.vx = -jumpDirection * movement.wallJumpHorizontalSpeed;
+  player.vy = -movement.jumpForce * movement.wallJumpVerticalMultiplier;
+  player.jumpBufferTimer = 0;
+  player.wallJumpLock = movement.wallJumpLockDuration;
+  player.wallJumpGraceTimer = 0;
+  player.wallSliding = false;
+  player.onWall = false;
+  player.wallDirection = 0;
+  player.jumpCutReady = true;
+  showMessage("Wall jump");
 }
 
 function moveHorizontally(player, dt) {
-  player.x += player.vx * dt;
-
-  for (const solid of getSolids()) {
-    if (!overlaps(player, solid)) {
-      continue;
-    }
-
-    if (player.vx > 0) {
-      player.x = solid.x - player.w;
-    } else if (player.vx < 0) {
-      player.x = solid.x + solid.w;
-    }
+  const result = resolveHorizontal(player, player.vx * dt, getSolids());
+  player.x = result.x;
+  if (result.collided) {
     player.vx = 0;
   }
 
@@ -1472,58 +2205,39 @@ function moveHorizontally(player, dt) {
 }
 
 function moveVertically(player, dt) {
-  player.y += player.vy * dt;
+  const movement = getMovementTuning(state, player);
+  const result = resolveVertical(player, player.vy * dt, getSolids());
+  player.y = result.y;
   player.onGround = false;
-
-  for (const solid of getSolids()) {
-    if (!overlaps(player, solid)) {
-      continue;
-    }
-
-    if (player.vy > 0) {
-      player.y = solid.y - player.h;
-      player.vy = 0;
-      player.onGround = true;
-      player.coyoteTimer = 0.12;
-      player.jumpCutReady = false;
-    } else if (player.vy < 0) {
-      player.y = solid.y + solid.h;
-      player.vy = 0;
-      player.jumpCutReady = false;
-    }
+  if (result.grounded) {
+    player.vy = 0;
+    player.onGround = true;
+    player.wallSliding = false;
+    player.coyoteTimer = movement.coyoteTime;
+    player.jumpCutReady = false;
+  } else if (result.ceilingHit) {
+    player.vy = 0;
+    player.jumpCutReady = false;
   }
 }
 
 function getWallTouch(player) {
-  const leftProbe = { x: player.x - 4, y: player.y + 8, w: 4, h: player.h - 16 };
-  const rightProbe = { x: player.x + player.w, y: player.y + 8, w: 4, h: player.h - 16 };
+  const solids = getSolids();
+  const leftProbe = createRect(player.x - 4, player.y + 8, 4, player.h - 16);
+  const rightProbe = createRect(player.x + player.w, player.y + 8, 4, player.h - 16);
 
-  for (const solid of getSolids()) {
-    if (overlaps(leftProbe, solid)) {
-      return { touching: true, direction: -1 };
-    }
-    if (overlaps(rightProbe, solid)) {
-      return { touching: true, direction: 1 };
-    }
+  if (probeOverlap(leftProbe, solids)) {
+    return { touching: true, direction: -1 };
+  }
+  if (probeOverlap(rightProbe, solids)) {
+    return { touching: true, direction: 1 };
   }
 
   return { touching: false, direction: 0 };
 }
 
 function getSolids() {
-  const solids = [...state.platforms, ...state.walls];
-  for (const platform of state.shadowPlatforms) {
-    if (state.world === platform.world) {
-      solids.push(platform);
-    }
-  }
-  if (state.barrier.active) {
-    solids.push(state.barrier);
-  }
-  if (state.gate.active) {
-    solids.push(state.gate);
-  }
-  return solids;
+  return collectWorldSolids(state);
 }
 
 function updateHazards() {
@@ -1535,8 +2249,9 @@ function updateHazards() {
     return;
   }
 
-  for (const hazard of state.hazards ?? []) {
-    if (!overlaps(state.player, hazard)) {
+  for (const entity of state.entities.getByType("hazard")) {
+    const hazard = entity.source;
+    if (!overlapsHazard(state.player, hazard)) {
       continue;
     }
 
@@ -1562,6 +2277,10 @@ function updateEnemies(dt) {
       continue;
     }
 
+    if (!enemy.aiStateMachine) {
+      initializeEnemyRuntime(enemy);
+    }
+
     enemy.invuln -= dt;
     enemy.hurtTimer -= dt;
     enemy.knockbackTimer -= dt;
@@ -1569,12 +2288,13 @@ function updateEnemies(dt) {
     enemy.stateTimer -= dt;
     enemy.contactCooldown -= dt;
     enemy.reactionTimer -= dt;
+    enemy.aiStateMachine.update(dt);
     if (enemy.reactionTimer <= 0) {
       enemy.reactionType = "none";
     }
     updateEnemyBehavior(enemy, dt);
 
-    if (overlaps(state.player, enemy) && state.player.invuln <= 0 && enemy.contactCooldown <= 0) {
+    if (overlapsHitbox(state.player, enemy) && state.player.invuln <= 0 && enemy.contactCooldown <= 0) {
       if (state.debugInvulnerable) {
         enemy.contactCooldown = 0.15;
         continue;
@@ -1753,24 +2473,34 @@ function updateEnemyBehavior(enemy, dt) {
 }
 
 function updateOracleBehavior(enemy, dt, horizontalDistance, facingToPlayer) {
-  const arenaWakeX = 2860;
+  const controller = enemy.bossController;
   const currentState = getEnemyState(enemy);
+  const phaseResult = resolveBossPhase(enemy, controller);
+
+  if (phaseResult.changed && enemy.awakened) {
+    spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.42, "#f7ead1", 18, 0.95);
+    applyScreenShake(0.12, 4.2);
+    showMessage(phaseResult.phase === "phase-2" ? "The Eclipse Lord enters a darker rhythm" : "The Eclipse Lord steadies");
+  }
 
   if (currentState === "idle" && !enemy.awakened) {
     enemy.vx = 0;
-    if (state.player.x >= arenaWakeX || horizontalDistance < 280) {
+    if (state.player.x >= controller.introWakeX || horizontalDistance < 280) {
       enemy.awakened = true;
       enemy.patrolDirection = facingToPlayer;
       spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.45, "#a8dfff", 22, 1.1);
       applyScreenShake(0.14, 4.5);
-      beginEnemyWindup(enemy, 0.2, facingToPlayer, {
-        type: "blink",
-        offset: facingToPlayer * 120,
-        travelTime: 0.1,
-        burstTime: 0.22,
-        speed: 220,
-        cooldown: 1.45,
-        recoveryTime: 0.22
+      queueBossAttack(enemy, facingToPlayer, {
+        windup: 0.2,
+        action: {
+          type: "blink",
+          offset: facingToPlayer * 120,
+          travelTime: 0.1,
+          burstTime: 0.22,
+          speed: 220,
+          cooldown: 1.45,
+          recoveryTime: 0.22
+        }
       });
     }
     return;
@@ -1835,21 +2565,39 @@ function updateOracleBehavior(enemy, dt, horizontalDistance, facingToPlayer) {
     return;
   }
 
-  if (horizontalDistance < 360 && enemy.actionCooldown <= 0) {
-    beginEnemyWindup(enemy, 0.28, facingToPlayer, {
-      type: "blink",
-      offset: facingToPlayer * 120,
-      travelTime: 0.1,
-      burstTime: 0.22,
-      speed: 220,
-      cooldown: 1.45,
-      recoveryTime: 0.22
+  if (enemy.actionCooldown <= 0) {
+    const selectedAttack = chooseBossAttack(controller, {
+      enemy,
+      phase: controller.phase,
+      horizontalDistance,
+      facingToPlayer,
+      player: state.player
     });
-    return;
+    if (selectedAttack) {
+      queueBossAttack(enemy, facingToPlayer, selectedAttack.buildAction({
+        enemy,
+        phase: controller.phase,
+        horizontalDistance,
+        facingToPlayer,
+        player: state.player
+      }));
+      return;
+    }
   }
 
-  moveEnemyInCurrentDirection(enemy, dt, enemy.baseSpeed);
+  moveEnemyInCurrentDirection(
+    enemy,
+    dt,
+    controller.phase === "phase-2"
+      ? enemy.baseSpeed + Math.sin(performance.now() * 0.007 + enemy.x * 0.012) * 14
+      : enemy.baseSpeed
+  );
   tryEnemyPatrolTurn(enemy);
+}
+
+function queueBossAttack(enemy, direction, attackConfig) {
+  enemy.patrolDirection = direction || enemy.patrolDirection || 1;
+  beginEnemyWindup(enemy, attackConfig.windup, enemy.patrolDirection, attackConfig.action);
 }
 
 function updateRevenantBehavior(enemy, dt, horizontalDistance, facingToPlayer) {
@@ -2018,33 +2766,42 @@ function updateDisplayValues(dt) {
 function updatePickups() {
   const player = state.player;
 
-  if (state.pickups.dash.active && overlaps(player, state.pickups.dash)) {
-    state.pickups.dash.active = false;
-    state.abilityUnlocked.Dash = true;
-    saveProgress();
-    showMessage("Dash unlocked");
-  }
+  for (const entity of state.entities.getByType("pickup")) {
+    const pickup = entity.source;
+    if (!pickup.active || !overlapsTrigger(player, pickup)) {
+      continue;
+    }
 
-  if (state.pickups.weapon.active && overlaps(player, state.pickups.weapon)) {
-    state.pickups.weapon.active = false;
-    player.weaponStage = 1;
-    saveProgress();
-    showMessage("Weapon evolved to Stage II");
+    if (entity.components.reward === "Dash") {
+      pickup.active = false;
+      state.abilityUnlocked.Dash = true;
+      saveProgress();
+      showMessage("Dash unlocked");
+      continue;
+    }
+
+    if (entity.components.reward === "WeaponStage") {
+      pickup.active = false;
+      player.weaponStage = 1;
+      saveProgress();
+      showMessage("Weapon evolved to Stage II");
+    }
   }
 }
 
 function updateCheckpoints() {
   state.nearbyCheckpointId = null;
-  for (const checkpoint of state.checkpoints) {
-    if (overlaps(state.player, checkpoint)) {
-      state.nearbyCheckpointId = checkpoint.id;
+  for (const entity of state.entities.getByType("checkpoint")) {
+    const checkpoint = entity.source;
+    if (overlapsTrigger(state.player, checkpoint)) {
+      state.nearbyCheckpointId = entity.components.checkpointId;
       return;
     }
   }
 }
 
 function updateGate() {
-  state.gate.active = !state.abilityUnlocked[state.gate.requiredAbility];
+  state.gate.active = !meetsRequirements(state.gate.requirements, state);
 }
 
 function updateCamera(dt) {
@@ -2053,6 +2810,7 @@ function updateCamera(dt) {
 }
 
 function updateHud() {
+  const currentRoom = getCurrentRoom(state);
   hud.health.textContent = `${state.player.hp} / ${state.player.maxHp}`;
   const hpPercent = clamp(state.player.hp / state.player.maxHp, 0, 1) * 100;
   const displayPercent = clamp(state.player.displayHp / state.player.maxHp, 0, 1) * 100;
@@ -2081,7 +2839,7 @@ function updateHud() {
   } else if (state.pickups.weapon.active) {
     hud.objective.textContent = "Claim the weapon upgrade";
   } else {
-    hud.objective.textContent = "Reach the exit chamber";
+    hud.objective.textContent = currentRoom.objectiveHint ?? "Reach the exit chamber";
   }
 }
 
@@ -2109,6 +2867,148 @@ function draw() {
   drawPlayer();
   drawParticles();
   drawForegroundFrames();
+  if (state.debug.showCombatBoxes) {
+    drawCombatDebugBoxes();
+  }
+  if (state.debug.showRequirements) {
+    drawRequirementDebugOverlay();
+  }
+  if (state.debug.showSaveState) {
+    drawSaveDebugOverlay();
+  }
+  ctx.restore();
+  drawDebugStateOverlay();
+}
+
+function drawCombatDebugBoxes() {
+  ctx.save();
+  const player = state.player;
+  ctx.strokeStyle = "rgba(92, 228, 255, 0.95)";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(player.x, player.y, player.w, player.h);
+
+  if (player.attackTimer > 0) {
+    const profile = getAttackProfileById(player, player.attackProfileId);
+    const hitbox = createPlayerAttackHitbox(player, profile, getCurrentAttackBox(player, profile));
+    ctx.strokeStyle = "rgba(255, 225, 125, 0.95)";
+    ctx.strokeRect(hitbox.x, hitbox.y, hitbox.w, hitbox.h);
+  }
+
+  ctx.strokeStyle = "rgba(255, 120, 165, 0.92)";
+  for (const enemy of state.enemies) {
+    if (!enemy.alive) {
+      continue;
+    }
+    const hurtbox = getEnemyHurtbox(enemy);
+    ctx.strokeRect(hurtbox.x, hurtbox.y, hurtbox.w, hurtbox.h);
+  }
+  ctx.restore();
+}
+
+function drawRequirementDebugOverlay() {
+  const labels = [];
+  const currentRoom = getCurrentRoom(state);
+  const roomEntities = getRoomEntities(state, currentRoom.id);
+
+  labels.push({
+    x: state.camera.x + 18,
+    y: 20,
+    text: `Room: ${currentRoom.label} | pickups ${roomEntities.pickups.length} | checkpoints ${roomEntities.checkpoints.length}`
+  });
+
+  if (state.gate.active) {
+    labels.push({
+      x: state.gate.x,
+      y: state.gate.y - 14,
+      text: `Gate: ${formatRequirements(state.gate.requirements)}`
+    });
+  }
+
+  if (state.barrier.active) {
+    labels.push({
+      x: state.barrier.x - 10,
+      y: state.barrier.y - 14,
+      text: `Barrier: ${formatRequirements(state.barrier.requirements)}`
+    });
+  }
+
+  for (const label of labels) {
+    ctx.save();
+    ctx.fillStyle = "rgba(10, 14, 24, 0.82)";
+    ctx.fillRect(label.x, label.y, Math.max(150, label.text.length * 7.2), 18);
+    ctx.fillStyle = "#f4ebc9";
+    ctx.font = "12px monospace";
+    ctx.fillText(label.text, label.x + 6, label.y + 12);
+    ctx.restore();
+  }
+}
+
+function formatRequirements(requirements) {
+  if (!requirements) {
+    return "none";
+  }
+  if (requirements.abilities?.length) {
+    return requirements.abilities.join(" + ");
+  }
+  if (requirements.element) {
+    return requirements.element;
+  }
+  if (requirements.world) {
+    return requirements.world;
+  }
+  if (requirements.anyOf?.length) {
+    return requirements.anyOf.map(formatRequirements).join(" or ");
+  }
+  return "custom";
+}
+
+function drawSaveDebugOverlay() {
+  const payload = getSavePayload(state);
+  const lines = [
+    `Save v${payload.version}`,
+    `Checkpoint: ${payload.checkpoint.id} (${payload.checkpoint.roomId})`,
+    `Dash: ${payload.progression.abilities.Dash ? "yes" : "no"}`,
+    `Weapon: ${payload.upgrades.weaponStage}`,
+    `Dash pickup: ${payload.roomFlags.pickups.dashCollected ? "taken" : "up"}`,
+    `Weapon pickup: ${payload.roomFlags.pickups.weaponCollected ? "taken" : "up"}`
+  ];
+
+  ctx.save();
+  ctx.fillStyle = "rgba(10, 14, 24, 0.84)";
+  ctx.fillRect(22, 112, 248, 18 + lines.length * 18);
+  ctx.fillStyle = "#dfe7ff";
+  ctx.font = "12px monospace";
+  lines.forEach((line, index) => {
+    ctx.fillText(line, 32, 130 + index * 18);
+  });
+  ctx.restore();
+}
+
+function drawDebugStateOverlay() {
+  if (!state.debug.showStateLabels) {
+    return;
+  }
+
+  const debugLines = [
+    `Player: ${state.player.actionState} (${state.player.actionStateTimer.toFixed(2)}s)`
+  ];
+
+  for (const enemy of state.enemies) {
+    if (!enemy.alive) {
+      continue;
+    }
+    debugLines.push(`${enemy.name}: ${getEnemyState(enemy)} (${Math.max(0, enemy.stateTimer).toFixed(2)}s)`);
+  }
+
+  ctx.save();
+  ctx.fillStyle = "rgba(8, 10, 18, 0.76)";
+  ctx.fillRect(18, 18, 320, 24 + debugLines.length * 18);
+  ctx.font = "13px monospace";
+  ctx.textBaseline = "top";
+  debugLines.forEach((line, index) => {
+    ctx.fillStyle = index === 0 ? "#f0ebd4" : "#bcd1ff";
+    ctx.fillText(line, 28, 28 + index * 18);
+  });
   ctx.restore();
 }
 
@@ -2393,6 +3293,9 @@ function getEnemyReactionOffset(enemy, strength) {
   if (enemy.reactionType === "finisher") {
     return -strength * 8;
   }
+  if (enemy.reactionType === "heavy" || enemy.reactionType === "elemental") {
+    return -strength * (enemy.staggeredByLastHit ? 6 : 4);
+  }
   return -strength * 3;
 }
 
@@ -2430,6 +3333,10 @@ function drawEnemyTelegraph(enemy) {
       ? "rgba(228, 246, 255, 0.9)"
       : enemy.reactionType === "finisher"
         ? "rgba(255, 223, 185, 0.88)"
+        : enemy.reactionType === "heavy"
+          ? "rgba(255, 232, 198, 0.84)"
+        : enemy.reactionType === "elemental"
+          ? "rgba(192, 235, 255, 0.82)"
         : "rgba(255, 244, 228, 0.76)";
     ctx.beginPath();
     ctx.ellipse(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.48, enemy.w * 0.78, enemy.h * 0.72, 0, 0, Math.PI * 2);
@@ -4337,15 +5244,17 @@ function startAmbientBed() {
   ambientNoiseNode.start();
 }
 
-let lastTime = performance.now();
-
-function loop(now) {
-  const dt = Math.min((now - lastTime) / 1000, 0.033);
-  lastTime = now;
-  update(dt);
-  draw();
-  requestAnimationFrame(loop);
-}
+const runtime = window.ShadowShiftRuntime.createRuntime({
+  timing: {
+    fixedStepSeconds: 1 / 120,
+    maxFrameDeltaSeconds: 1 / 30,
+    maxFixedSteps: 4
+  },
+  onFrame(frame) {
+    update(frame);
+    draw();
+  }
+});
 
 updateHud();
-requestAnimationFrame(loop);
+runtime.start();
