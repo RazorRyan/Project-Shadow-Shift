@@ -1,0 +1,54 @@
+Title
+Entity Component System Prompt
+
+Purpose
+Introduce a lightweight ECS-inspired structure for Shadow Shift entities so player, enemies, pickups, hazards, projectiles, and effects can scale without turning into hardcoded one-off objects.
+
+Why This Matters for V2
+As Shadow Shift adds more enemy types, interactables, room objects, and combat rules, direct bespoke object logic will become expensive to maintain. A lightweight ECS-style layer improves extensibility without forcing an engine rewrite.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift is a vanilla JavaScript HTML5 canvas game. It already has working gameplay systems and should remain playable during the upgrade.
+
+Goal:
+Design and implement a minimal ECS-style entity architecture that coexists with the existing game structure and can gradually absorb current object types.
+
+Implementation Steps:
+1. Introduce an entity registry that stores entities by id and type.
+2. Define a lightweight component model using plain objects. Components should be simple data containers such as:
+   - transform
+   - physics
+   - collider
+   - renderable
+   - health
+   - hurtbox
+   - hitbox
+   - AI state
+   - elemental state
+   - shadow state
+3. Add systems that iterate over relevant entities each frame, such as movement, collision, combat, and rendering preparation.
+4. Migrate one or two representative categories first, such as pickups/effects and one enemy family, before touching everything.
+5. Keep the player and bosses on compatibility wrappers if a full migration would be risky.
+6. Provide helper factories to build entities cleanly.
+7. Document how old runtime objects map to ECS components.
+
+Constraints:
+- No full rewrite
+- Use plain JavaScript objects and arrays/maps only
+- Avoid class-heavy abstractions
+- Keep the current gameplay running
+- Maintain performance and readability
+
+Implementation Notes
+- This should be a pragmatic ECS, not a textbook engine framework.
+- Favor incremental adoption.
+- Systems should remain deterministic and easy to debug.
+- Avoid deep inheritance; composition should do most of the work.
+
+Validation Checklist
+- Entities can be created, updated, and removed safely
+- At least one current gameplay category uses the new ECS-style path
+- Rendering and collisions still behave correctly
+- The migration path for more entity types is obvious
+- The new structure reduces special-case logic rather than increasing it

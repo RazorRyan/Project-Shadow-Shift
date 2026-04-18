@@ -1,0 +1,49 @@
+Title
+Combo System Prompt
+
+Purpose
+Expand Shadow Shift's melee into a cleaner V2 combo system with timing windows, attack identity per hit, and support for future upgrades and elements.
+
+Why This Matters for V2
+One-hit melee can be enough for a prototype, but V2 needs a more expressive combat loop. A good combo system adds rhythm, intention, and room for upgrades without forcing complexity.
+
+Detailed Codex Instructions
+Context:
+The game already has basic melee and a lightweight combo chain. This pass should mature it into a scalable V2 system.
+
+Goal:
+Implement a clean combo framework that supports multi-step chains, branching potential, and readable tuning.
+
+Implementation Steps:
+1. Audit current attack initiation, combo timing windows, attack profiles, hitbox timing, and recovery.
+2. Move attack definitions into a structured data format, such as arrays or config objects, with fields for:
+   - startup
+   - active time
+   - recovery
+   - damage
+   - knockback
+   - hitbox size/offset
+   - movement impulse
+   - special tags
+3. Refactor combo handling so each step is data-driven rather than copy-pasted.
+4. Keep controls simple, likely one attack button plus directional context where needed.
+5. Preserve current slash FX and layer in support for future weapon variants.
+6. Add clear hooks for combo finisher reactions and elemental overrides.
+
+Constraints:
+- Vanilla JavaScript only
+- No full combat rewrite
+- Preserve input responsiveness
+- Keep hit readability strong
+
+Implementation Notes
+- Think in attack definitions, not hardcoded branches.
+- Build for extensibility toward Weapon Evolution later.
+- Make timing windows easy to tune in one place.
+
+Validation Checklist
+- Basic combo chain still works
+- Attack steps feel distinct
+- Combo data is easy to extend
+- Slash effects and hit detection remain aligned
+- The system supports future branching without rework

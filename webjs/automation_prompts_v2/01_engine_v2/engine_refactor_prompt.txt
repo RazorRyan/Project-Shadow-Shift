@@ -1,0 +1,56 @@
+Title
+Engine Refactor Prompt
+
+Purpose
+Refactor the Shadow Shift browser game into a clearer V2 engine structure without rewriting the entire project. The goal is to separate core runtime concerns such as input, update flow, rendering, entity data, combat, rooms, and effects so future systems can be added safely.
+
+Why This Matters for V2
+Shadow Shift has already proven its core fantasy, but continued feature growth will become brittle if everything remains in a single expanding runtime file. A focused engine refactor improves scalability, debugging, testability, and long-term iteration speed while preserving the current playable slice.
+
+Detailed Codex Instructions
+Context:
+You are working on a vanilla JavaScript, HTML, and Canvas game called Shadow Shift. The project already includes movement, combat, enemies, room progression, Shadow Swap, Element Shift, save/checkpoint systems, and visual polish. The current goal is architectural improvement, not a full rewrite.
+
+Goal:
+Refactor the codebase into a V2 engine structure that separates responsibilities while keeping gameplay behavior functional and recognizable.
+
+Implementation Steps:
+1. Audit the current JavaScript runtime and identify major domains: boot/setup, input, player, enemies, combat, rooms/world, rendering, UI, FX, save/checkpoint, and utility math/helpers.
+2. Introduce a lightweight module organization using plain JavaScript files and explicit load order from `index.html`. Do not introduce build tooling or frameworks.
+3. Extract shared constants and configuration into dedicated modules where practical.
+4. Split monolithic update and render responsibilities into domain-specific modules such as:
+   - engine/bootstrap
+   - engine/runtime
+   - engine/input
+   - game/player
+   - game/enemies
+   - game/combat
+   - game/world
+   - game/rendering
+   - game/ui
+5. Preserve the current runtime state object, but organize access so subsystems operate through focused helper functions instead of touching unrelated fields.
+6. Reduce circular dependencies by keeping low-level helpers stateless where possible.
+7. Keep comments clear and concise, especially around module responsibilities and state ownership.
+8. Avoid changing mechanics unless required to complete the refactor safely.
+
+Constraints:
+- Use vanilla JavaScript only
+- Keep the HTML/CSS/canvas stack
+- Do not rewrite the whole game
+- Preserve current save data and room flow if possible
+- Keep the app launch process simple
+- Favor incremental file extraction over massive rearchitecture
+
+Implementation Notes
+- Prefer feature-slice modules over utility dumping grounds.
+- Keep module APIs explicit and small.
+- If a large `game.js` still remains, reduce it to orchestration and compatibility glue.
+- Maintain backward-compatible naming where it lowers migration risk.
+- If needed, add a transitional compatibility layer so old calls route to new modules safely.
+
+Validation Checklist
+- The game still boots and plays in the browser
+- Input, movement, combat, rooms, and rendering still work
+- Core systems are split into readable modules
+- No major feature regressions are introduced
+- The codebase is easier to navigate and extend than before

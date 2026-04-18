@@ -1,0 +1,43 @@
+Title
+Wall Interaction Prompt
+
+Purpose
+Refine Shadow Shift's wall slide, wall jump, and wall contact behavior so vertical traversal feels more deliberate, readable, and mechanically useful.
+
+Why This Matters for V2
+Wall interactions are a cornerstone of exploration rhythm in Metroidvanias. If they feel sticky, sloppy, or inconsistent, traversal quality drops sharply.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already supports wall interaction, but V2 should tune and structure it more carefully.
+
+Goal:
+Make wall behavior cleaner and more expressive while preserving the current collision setup and core traversal routes.
+
+Implementation Steps:
+1. Audit current wall detection, wall slide entry, wall jump launch, input buffering, and edge cases.
+2. Improve separation between touching a wall, sliding on a wall, and jumping off a wall.
+3. Add clear rules for:
+   - when wall slide begins
+   - when wall slide should stop
+   - how wall jump direction and momentum are applied
+   - brief movement lockouts or forgiveness windows if needed
+4. Keep dash and pogo compatibility intact.
+5. Organize wall interaction tuning values together for easy iteration.
+
+Constraints:
+- Preserve current room traversal viability
+- Do not change level geometry significantly
+- Keep wall interaction readable and skill-based
+
+Implementation Notes
+- Wall behavior should reward intention, not accidental friction.
+- Small input grace windows are acceptable if they improve feel.
+- Ensure animation/presentation hooks exist for future polish.
+
+Validation Checklist
+- Wall slide triggers reliably
+- Wall jump direction feels intentional
+- Dash and wall interactions do not fight each other
+- Existing wall-based routes still work
+- Behavior is easier to tune and debug

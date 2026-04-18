@@ -1,0 +1,46 @@
+Title
+Enemy Reaction System Prompt
+
+Purpose
+Formalize Shadow Shift's enemy reaction model so hits, pogo impacts, finishers, stagger windows, and elemental effects produce clearer and more consistent responses.
+
+Why This Matters for V2
+Enemies that merely lose health feel flat. Reactions create combat texture, communicate hit strength, and give the player satisfying feedback for mastery.
+
+Detailed Codex Instructions
+Context:
+Enemy reactions already exist in some form. This pass should turn them into a more intentional system rather than one-off timers and render offsets.
+
+Goal:
+Create a modular reaction framework that works across enemy types while preserving their identity.
+
+Implementation Steps:
+1. Audit current hurt states, hit flash behavior, knockback, stagger, and render feedback.
+2. Define a small set of reaction types, such as:
+   - light hit
+   - heavy hit
+   - pogo hit
+   - finisher hit
+   - elemental reaction
+   - stagger break
+3. Add reaction data fields or helper functions that map incoming hit properties to response behavior.
+4. Keep enemy archetype-specific overrides so goblins, demons, watchers, and bosses still feel different.
+5. Integrate the reaction system cleanly with AI states and recovery timing.
+6. Add subtle but readable visual cues in the current canvas style.
+
+Constraints:
+- Preserve current enemy identities
+- Avoid overcomplicating base enemies
+- Keep performance-friendly data structures
+
+Implementation Notes
+- Reaction logic should be driven by hit metadata where practical.
+- Bosses should use the same foundation with more guarded rules.
+- Keep reactions readable but not overly cinematic.
+
+Validation Checklist
+- Different hit types feel distinct
+- Enemy reactions are more consistent than before
+- AI state transitions still work
+- Bosses are not trivially stun-locked unless intentionally designed
+- Combat feels more satisfying overall

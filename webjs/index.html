@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="theme-color" content="#0a0d16">
+  <title>Shadow Shift Web</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app">
+    <section class="hud-panel">
+      <div class="brand-lockup">
+        <p class="eyebrow">Echo build 0.1</p>
+        <h1>Shadow Shift</h1>
+        <p class="subtitle">Atmospheric browser vertical slice</p>
+      </div>
+      <div class="stats">
+        <div class="health-row">
+          <span>Health</span>
+          <div class="health-readout">
+            <div class="health-bar-shell">
+              <div id="healthBarGhost" class="health-bar-ghost"></div>
+              <div id="healthBar" class="health-bar-fill"></div>
+            </div>
+            <strong id="healthValue">5 / 5</strong>
+          </div>
+        </div>
+        <div><span>World</span><strong id="worldValue">Light</strong></div>
+        <div><span>Element</span><strong id="elementValue">None</strong></div>
+        <div><span>Weapon</span><strong id="weaponValue">Shard Blade I</strong></div>
+        <div>
+          <span>Invulnerable</span>
+          <div class="debug-toggle-row">
+            <strong id="invulnerableValue">Off</strong>
+            <button id="invulnerableToggleButton" type="button">Toggle</button>
+          </div>
+        </div>
+        <div><span>Objective</span><strong id="objectiveValue">Reach the exit gate</strong></div>
+      </div>
+      <div class="controls">
+        <h2>Controls</h2>
+        <div class="control-grid">
+          <p><kbd>A</kbd><kbd>D</kbd><span>Move</span></p>
+          <p><kbd>Space</kbd><span>Jump</span></p>
+          <p><kbd>Shift</kbd><span>Dash</span></p>
+          <p><kbd>F</kbd><span>Attack</span></p>
+          <p><kbd>E</kbd><span>Shadow Swap</span></p>
+          <p><kbd>R</kbd><span>Rest / Save at shrine</span></p>
+          <p><kbd>I</kbd><span>Toggle invulnerable</span></p>
+          <p><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>0</kbd><span>Elements</span></p>
+        </div>
+      </div>
+      <div class="legend">
+        <p><span class="chip light"></span> Light world geometry</p>
+        <p><span class="chip shadow"></span> Shadow world geometry</p>
+        <p><span class="chip fire"></span> Fire can burn barriers</p>
+      </div>
+    </section>
+    <section class="game-panel">
+      <canvas id="gameCanvas" width="1280" height="720" aria-label="Shadow Shift game view"></canvas>
+      <div id="touchHud" class="touch-hud" aria-label="Touch controls">
+        <div class="touch-cluster touch-move">
+          <button class="touch-button touch-wide" data-touch="left" aria-label="Move left">Left</button>
+          <button class="touch-button touch-wide" data-touch="right" aria-label="Move right">Right</button>
+        </div>
+        <div class="touch-cluster touch-actions">
+          <button class="touch-button touch-jump" data-touch-tap="jump" aria-label="Jump">Jump</button>
+          <button class="touch-button" data-touch-tap="attack" aria-label="Attack">Attack</button>
+          <button class="touch-button" data-touch-tap="dash" aria-label="Dash">Dash</button>
+          <button class="touch-button" data-touch-tap="swap" aria-label="Shadow swap">Swap</button>
+          <button class="touch-button" data-touch-tap="rest" aria-label="Rest at shrine">Rest</button>
+          <button class="touch-button" data-touch-tap="element" aria-label="Cycle element">Element</button>
+        </div>
+      </div>
+      <div id="startOverlay" class="screen-overlay">
+        <div class="screen-panel title-panel">
+          <p class="panel-kicker">A drifting soulslike prototype</p>
+          <h2>Shadow Shift</h2>
+          <p class="panel-copy">Slip between Light and Shadow, claim your first powers, and carve a path through the ruined keep.</p>
+          <div class="panel-actions">
+            <button id="startButton" type="button">Enter the Ruin</button>
+            <span class="hint-text">Press Enter, Space, or tap to begin</span>
+          </div>
+        </div>
+      </div>
+      <div id="messageOverlay" class="message-overlay hidden"></div>
+      <div id="deathOverlay" class="death-overlay hidden">
+        <div class="screen-panel death-panel">
+          <h2>You Died</h2>
+          <p id="deathReason">The shadows overwhelmed you.</p>
+          <div class="panel-actions panel-actions-center">
+            <button id="retryButton" type="button">Retry from Shrine</button>
+            <button id="restartLevelButton" type="button">Restart Level</button>
+          </div>
+        </div>
+      </div>
+      <div id="winOverlay" class="screen-overlay hidden">
+        <div class="screen-panel win-panel">
+          <p class="panel-kicker">Vertical Slice Cleared</p>
+          <h2>The Shrine Answers</h2>
+          <p id="winReason">You reached the exit sanctum and carried the shard through the dark.</p>
+          <div class="panel-actions">
+            <button id="restartWinButton" type="button">Play Again</button>
+            <button id="restartLevelWinButton" type="button">Restart Level</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="./game.js"></script>
+</body>
+</html>

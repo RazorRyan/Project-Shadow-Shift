@@ -1,0 +1,45 @@
+Title
+State Machine System Prompt
+
+Purpose
+Create a reusable lightweight state machine system for Shadow Shift that supports player states, enemy states, boss phases, interactables, and room scripts.
+
+Why This Matters for V2
+State-driven gameplay is already important in Shadow Shift, but one-off ad hoc states will become difficult to scale. A shared state machine utility improves consistency, debuggability, and designer-facing clarity.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already uses explicit states for some systems, especially enemy AI. V2 should formalize that pattern into a reusable framework.
+
+Goal:
+Build a generic but lightweight state machine layer that supports entry, update, exit, timers, guards, and debug visibility.
+
+Implementation Steps:
+1. Design a small state machine helper that can:
+   - hold current state
+   - transition to new states
+   - track state time
+   - run `enter`, `update`, and `exit` hooks
+   - allow transition guards
+2. Apply it first to one or two systems that already depend on states heavily, such as enemy AI and player combat/movement substates.
+3. Add optional debug labels or overlay hooks to inspect active states.
+4. Keep states data-driven enough that new enemy/boss types can define behavior cleanly.
+5. Avoid overengineering; prioritize readability and maintainability.
+
+Constraints:
+- Plain JavaScript only
+- No framework-level rewrite
+- Keep runtime overhead low
+- Preserve current gameplay identities
+
+Implementation Notes
+- The utility should reduce copy-pasted state timing logic.
+- It should be easy to opt in gradually.
+- Prefer small helper objects/functions over deep abstractions.
+
+Validation Checklist
+- At least two systems use the reusable state machine successfully
+- State transitions are easier to debug than before
+- Timers and entry/exit behavior are centralized
+- No major gameplay regressions appear
+- Adding a new state to an entity is noticeably easier

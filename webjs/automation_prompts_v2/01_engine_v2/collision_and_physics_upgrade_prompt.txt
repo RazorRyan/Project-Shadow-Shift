@@ -1,0 +1,47 @@
+Title
+Collision and Physics Upgrade Prompt
+
+Purpose
+Improve Shadow Shift's collision and lightweight physics layer for more stable traversal, cleaner combat interactions, and easier future expansion.
+
+Why This Matters for V2
+Metroidvania feel lives and dies on collision trust. As new attacks, pogo, hazards, projectiles, and room interactions expand, a brittle collision layer becomes a constant source of bugs and feel regressions.
+
+Detailed Codex Instructions
+Context:
+The game already has working movement and collision, but V2 needs a more intentional physics/collision layer while staying in vanilla JavaScript and simple geometry.
+
+Goal:
+Refine collision detection and response so player traversal, enemy movement, attacks, hazards, and platform interactions behave more consistently without changing the overall physics model drastically.
+
+Implementation Steps:
+1. Audit current world collision, entity overlap checks, hit detection, and hazard checks.
+2. Separate solid world collision from combat collision and trigger interactions.
+3. Centralize AABB helper logic and any sweep/resolution helpers in one place.
+4. Improve horizontal and vertical movement resolution order so edge cases like corner catches and pogo bounces remain stable.
+5. Add clearer helpers for:
+   - solid collision
+   - trigger overlap
+   - hurtbox/hitbox collision
+   - hazard contact
+   - one-way or special surfaces if they already exist or are planned
+6. Preserve simple collision geometry and current room layout.
+7. Document assumptions such as axis order, epsilon usage, and grounded checks.
+
+Constraints:
+- Keep collision geometry simple
+- Do not introduce a heavy physics engine
+- Preserve current room shapes and gameplay flow
+- Avoid rewriting player movement from scratch
+
+Implementation Notes
+- Focus on determinism and readability.
+- Small helper functions are better than duplicated inline overlap logic.
+- Use the upgrade to make later systems like ranged enemies and room scripting safer.
+
+Validation Checklist
+- Player movement remains stable
+- Combat hits still register correctly
+- Hazards still function
+- Enemy/world collision remains intact
+- Collision code is more modular and easier to extend

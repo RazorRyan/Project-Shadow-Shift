@@ -1,0 +1,40 @@
+Title
+Stagger and Knockback Prompt
+
+Purpose
+Upgrade stagger and knockback in Shadow Shift so impact strength, enemy weight, combo finishers, and player feedback all feel more intentional.
+
+Why This Matters for V2
+Without strong impact rules, combat feels mushy. A good stagger and knockback system adds rhythm, punish windows, and enemy personality.
+
+Detailed Codex Instructions
+Context:
+The game already has some hit response and enemy state handling. This pass should formalize stagger and knockback as V2 combat systems.
+
+Goal:
+Implement clearer, more data-driven stagger and knockback behavior for player-to-enemy combat, and ensure the system can support bosses and elites.
+
+Implementation Steps:
+1. Audit current knockback vectors, enemy hurt behavior, and any stagger timing.
+2. Add per-enemy or per-archetype resistance values such as weight, stagger threshold, and knockback scale.
+3. Add per-attack impact properties so combo finishers and pogo hits can feel stronger.
+4. Clarify how knockback interacts with AI states, patrol limits, and walls.
+5. Ensure stagger has readable entry and exit conditions.
+6. Keep the system compatible with future elemental or weapon upgrades.
+
+Constraints:
+- Do not make enemies uncontrollable physics objects
+- Preserve current archetype personalities
+- Keep collision and room integrity intact
+
+Implementation Notes
+- Use explicit impact values rather than many hardcoded special cases.
+- Bosses and elites should use the same system with stronger resistances and guarded openings.
+- Readability is more important than realism.
+
+Validation Checklist
+- Light and heavy hits feel different
+- Heavier enemies resist knockback more
+- Stagger windows are understandable
+- Wall/collision interactions remain stable
+- Combat has more rhythm and payoff

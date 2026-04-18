@@ -1,0 +1,47 @@
+Title
+Game Loop and Timing Prompt
+
+Purpose
+Upgrade Shadow Shift's frame update and timing model so movement, combat, FX, and AI stay responsive and consistent across variable frame rates.
+
+Why This Matters for V2
+Premium-feeling action games depend on stable timing. If dt handling, timers, hitstop, animation timing, and effect lifetime logic are inconsistent, the whole game feels cheaper even when systems are present.
+
+Detailed Codex Instructions
+Context:
+The game already runs in the browser using `requestAnimationFrame`. The next step is to make timing behavior more robust without changing the overall canvas architecture.
+
+Goal:
+Implement a more reliable V2 game loop with clearer timing ownership and support for fixed-step gameplay updates where helpful.
+
+Implementation Steps:
+1. Audit the current main loop, dt calculation, timer handling, and update order.
+2. Introduce a timing module that manages:
+   - current time
+   - delta time
+   - clamped delta time
+   - accumulated time for fixed-step updates if used
+   - time scaling and hitstop support
+3. Separate render interpolation concerns from gameplay simulation where practical.
+4. Move combat timers, state timers, FX timers, cooldowns, and animation timers toward a shared timing convention.
+5. Protect the simulation from giant dt spikes when tab focus changes or the page resumes.
+6. Ensure pause, death screen, shrine rest, and other overlays interact predictably with the loop.
+7. Keep code comments clear around update order and timing rules.
+
+Constraints:
+- Use vanilla JavaScript and browser-native timing only
+- Do not add external libraries
+- Preserve current gameplay feel as much as possible
+- Avoid introducing visible jitter
+
+Implementation Notes
+- A hybrid loop is acceptable: fixed-step gameplay plus variable rendering.
+- Keep hitstop intentional and localized.
+- If full fixed-step conversion is too risky, at minimum centralize dt conventions and clamp behavior.
+
+Validation Checklist
+- The game remains responsive at normal frame rates
+- Large frame spikes do not break movement or combat
+- Timers behave consistently after pause/tab switching
+- Hitstop and slowdowns feel intentional
+- The main loop is easier to reason about than before

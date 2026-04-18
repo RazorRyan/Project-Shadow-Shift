@@ -1,0 +1,47 @@
+Title
+Hit Detection and Hurtboxes Prompt
+
+Purpose
+Upgrade Shadow Shift's combat collision into a clearer hitbox/hurtbox system with stronger timing control and cleaner extensibility for enemies, bosses, and future ranged attacks.
+
+Why This Matters for V2
+Combat quality depends on trust. If the player cannot tell what can hit, when it can hit, and why a hit happened, the game feels unfair even when values are technically correct.
+
+Detailed Codex Instructions
+Context:
+The current game already supports melee combat and enemy contact damage. V2 needs a more intentional hit detection layer without replacing the entire architecture.
+
+Goal:
+Implement a clearer hurtbox/hitbox model with better lifetime control, ownership, filtering, and debug visibility.
+
+Implementation Steps:
+1. Audit current melee collision, enemy damage checks, hazard damage, and any projectile or special attack overlaps.
+2. Separate hurtboxes from hitboxes conceptually and in code.
+3. Add structured hitbox definitions with fields like:
+   - owner id/type
+   - team/faction
+   - lifetime
+   - damage
+   - knockback
+   - hit tags
+   - elemental tags
+4. Add hurtbox filtering rules so allies, invulnerable states, or already-hit targets are handled cleanly.
+5. Introduce optional debug rendering toggles for hitboxes and hurtboxes.
+6. Preserve the current simple geometry approach.
+
+Constraints:
+- No heavy physics engine
+- Keep performance reasonable
+- Preserve current combat feel while improving correctness
+
+Implementation Notes
+- One clean combat overlap pipeline is better than many ad hoc checks.
+- Build with future bosses, ranged enemies, and environmental attacks in mind.
+- Make repeat-hit prevention explicit rather than incidental.
+
+Validation Checklist
+- Melee still lands reliably
+- Enemy contact or attack damage still works
+- Hit ownership and filtering are clearer
+- Debugging combat collisions is easier
+- The system is ready for richer attack types

@@ -1,0 +1,45 @@
+Title
+Boss AI Upgrade Prompt
+
+Purpose
+Elevate Shadow Shift's boss encounter architecture so bosses use more deliberate phase logic, clearer attack selection, and stronger combat readability.
+
+Why This Matters for V2
+Bosses are where the game's systems come together. If the boss architecture is too improvised, each new major encounter becomes expensive and inconsistent.
+
+Detailed Codex Instructions
+Context:
+The current game already includes at least one boss. This pass should improve boss behavior architecture, not just tune numbers.
+
+Goal:
+Build a reusable boss AI framework that supports phases, attack selection, openings, reactions, and room awareness.
+
+Implementation Steps:
+1. Audit current boss update flow, phase logic, telegraphing, cooldowns, and movement patterns.
+2. Introduce a boss controller structure with:
+   - explicit phases
+   - attack catalog/data
+   - cooldowns and attack weights
+   - positional conditions
+   - vulnerability/stagger windows
+3. Refactor the existing boss to use the new framework.
+4. Add hooks for room scripting, camera emphasis, music/FX triggers, and future multi-phase bosses.
+5. Keep the design readable and fair rather than purely aggressive.
+
+Constraints:
+- Preserve the current boss identity
+- No full combat engine rewrite
+- Keep performance stable
+- Avoid excessively scripted sequences that break replayability
+
+Implementation Notes
+- Attack selection should be intentional, not random spam.
+- Build the framework for at least one future boss type.
+- Phase transitions should feel meaningful and readable.
+
+Validation Checklist
+- The current boss still functions
+- Boss logic is easier to extend for future encounters
+- Phases and attacks are clearer to tune
+- Telegraphing and punish windows improve fairness
+- No major regressions in boss room flow

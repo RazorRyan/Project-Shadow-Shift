@@ -1,0 +1,45 @@
+Title
+Dash Refactor Prompt
+
+Purpose
+Refactor the dash system so it remains sharp and satisfying while becoming easier to extend with upgrades, elements, and combat interactions.
+
+Why This Matters for V2
+Dash is often the most identity-defining movement button in an action Metroidvania. It must feel surgically precise while supporting future complexity.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already has a working dash. This pass is about cleaner implementation, better tuning control, and stronger compatibility with combat and special systems.
+
+Goal:
+Upgrade dash architecture and feel without changing the core one-button dash fantasy.
+
+Implementation Steps:
+1. Audit the current dash entry conditions, duration, speed, cooldown, cancel rules, and collision behavior.
+2. Extract dash behavior into clearer functions or a dedicated movement/combat submodule.
+3. Ensure dash cooperates cleanly with:
+   - jump states
+   - wall interaction
+   - attack states
+   - Shadow Swap
+   - Element Shift
+4. Add explicit presentation hooks for dash smear, afterimage, or sound timing if not already present.
+5. Centralize dash tuning values and document the design intent of each.
+6. Avoid feature creep unless required for maintainability.
+
+Constraints:
+- Do not make dash sluggish
+- Preserve current room solutions that depend on dash
+- Keep code incremental and testable
+
+Implementation Notes
+- Consider explicit dash substate handling if currently too implicit.
+- Keep invulnerability rules and damage interactions easy to inspect.
+- If air dash limitations exist, preserve them unless an upgrade system intentionally changes them.
+
+Validation Checklist
+- Dash still feels responsive
+- Dash works cleanly with combat and traversal
+- Dash code is easier to extend
+- Existing routes and encounters still function
+- Tuning values are easy to locate and adjust

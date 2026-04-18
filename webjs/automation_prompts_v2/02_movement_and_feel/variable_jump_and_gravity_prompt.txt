@@ -1,0 +1,45 @@
+Title
+Variable Jump and Gravity Prompt
+
+Purpose
+Upgrade Shadow Shift's jump model with finer control over jump height, gravity shaping, apex feel, and fall response while preserving the current responsive platforming foundation.
+
+Why This Matters for V2
+Premium action-platformers feel expressive in the air. Variable jump, apex control, and intentional gravity curves make the player feel skilled without requiring complicated inputs.
+
+Detailed Codex Instructions
+Context:
+Shadow Shift already has run, jump, dash, wall interaction, coyote time, jump buffering, and elemental modifiers. The current goal is to improve the feel and tuning quality of those systems rather than replace them.
+
+Goal:
+Refine jump and gravity behavior so the player gets better control, clearer short-hop/full-hop expression, and stronger airborne feel.
+
+Implementation Steps:
+1. Audit current jump launch, jump cut, coyote time, jump buffer, fall speed, and gravity multipliers.
+2. Add or refine:
+   - jump cut when releasing jump early
+   - separate rise and fall gravity
+   - apex gravity shaping for better control near the top of the jump
+   - optional terminal fall tuning
+3. Preserve wall jump, dash, pogo, and element interactions.
+4. Centralize movement tuning values into a player movement config object or module.
+5. Keep code readable and documented with concise comments about why each gravity phase exists.
+6. Avoid making the jump floaty unless a specific ability or element state intends it.
+
+Constraints:
+- Vanilla JavaScript only
+- No physics engine rewrite
+- Preserve current movement readability
+- Keep controls responsive on keyboard and future mobile adaptation
+
+Implementation Notes
+- Tuning matters more than feature count here.
+- Distinguish mechanical values from presentation values.
+- If wind or other elements modify gravity, keep the system extensible.
+
+Validation Checklist
+- Short hop and full hop feel distinct
+- Falling feels intentional and readable
+- Dash, wall jump, and pogo still work
+- Jump buffer and coyote time still function
+- Movement feels more premium, not mushier

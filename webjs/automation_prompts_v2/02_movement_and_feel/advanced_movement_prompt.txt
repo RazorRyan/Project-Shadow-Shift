@@ -1,0 +1,41 @@
+Title
+Advanced Movement Prompt
+
+Purpose
+Extend Shadow Shift's player movement with a cleaner V2 movement stack that supports future traversal depth without bloating the current control model.
+
+Why This Matters for V2
+Movement is the heart of a Metroidvania. If the architecture for movement remains too ad hoc, each new traversal mechanic will become progressively riskier to add and tune.
+
+Detailed Codex Instructions
+Context:
+The game already includes run, jump, dash, wall interactions, and some advanced combat traversal. This pass should organize and deepen the movement stack without overwhelming the player.
+
+Goal:
+Refactor movement into a clearer, more extensible system and add premium-feeling control behavior where safe.
+
+Implementation Steps:
+1. Audit current player movement update flow and identify responsibilities: input read, facing, grounded checks, jump logic, air control, dash, wall states, and special traversal actions.
+2. Separate movement tuning, state, and execution into clearer helpers or modules.
+3. Improve acceleration/deceleration and air control consistency if needed.
+4. Add safe extensibility points for future movement upgrades like double jump variants, glide, phase step, or grapple without implementing all of them now.
+5. Make sure movement states compose cleanly with combat actions and Shadow/Element systems.
+6. Retain current responsiveness and player readability.
+
+Constraints:
+- No full movement rewrite
+- Preserve existing controls
+- Keep keyboard feel tight
+- Do not break room geometry or collision assumptions
+
+Implementation Notes
+- Focus on modularity and composability.
+- Movement should be driven by explicit state and clear helper functions.
+- Avoid introducing heavy abstractions if a well-structured plain-object approach is enough.
+
+Validation Checklist
+- Existing movement still feels good or better
+- The code is easier to extend with new traversal abilities
+- Combat and movement interactions remain stable
+- No major regressions in edge cases like wall corners or shrine respawn
+- Movement tuning values are easier to find and edit

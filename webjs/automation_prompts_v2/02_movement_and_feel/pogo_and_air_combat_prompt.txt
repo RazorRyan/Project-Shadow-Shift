@@ -1,0 +1,40 @@
+Title
+Pogo and Air Combat Prompt
+
+Purpose
+Deepen Shadow Shift's aerial combat by improving downslash/pogo behavior and making airborne attack decisions more expressive and reliable.
+
+Why This Matters for V2
+Air combat turns traversal into combat and combat into traversal. When pogo is strong and readable, the world design possibilities expand dramatically.
+
+Detailed Codex Instructions
+Context:
+The game already has a downslash/pogo-style mechanic. V2 should make it cleaner, more extensible, and better integrated with enemies, hazards, and room design.
+
+Goal:
+Refine pogo and air combat into a dependable system that supports combat mastery and traversal expression.
+
+Implementation Steps:
+1. Audit current aerial attack states, downslash detection, pogo bounce rules, valid targets, and hit feedback.
+2. Separate pogo logic from general attack logic while keeping the systems compatible.
+3. Make valid pogo surfaces explicit, such as enemies, spikes, breakables, and special world objects.
+4. Improve bounce timing, bounce strength, and hazard grace rules so the mechanic feels fair and intentional.
+5. Ensure the system is future-proof for elemental pogo interactions or special enemy counters.
+6. Keep slash FX and hit feedback aligned with the mechanic.
+
+Constraints:
+- Preserve current melee architecture
+- Avoid breaking normal aerial attacks
+- Keep inputs simple and readable
+
+Implementation Notes
+- Consider a dedicated air attack profile table if attack tuning is getting too scattered.
+- Make pogo success states easy to debug.
+- Do not let pogo trivialize all hazards unless the design explicitly supports that.
+
+Validation Checklist
+- Downslash is easy to trigger intentionally
+- Pogo bounce feels satisfying and consistent
+- Enemies and hazards react correctly
+- Air combat is more expressive than before
+- Existing traversal remains valid or improves
