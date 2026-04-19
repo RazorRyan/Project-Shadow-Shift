@@ -48,6 +48,12 @@ export const ROOM_REGISTRY = {
       { x: 1056, y: 544, label: "Ruin Husk" },
       { x: 1152, y: 544, label: "Guard Shell" },
     ],
+    checkpoints: [
+      { id: "cp-ruin-hall-1", x: 64, y: 552, w: 80, h: 72, spawnId: "left" },
+    ],
+    npcSpawns: [
+      { x: 240, y: 560, dialogueId: "gate_keeper", label: "Gate Keeper" },
+    ],
   },
 
   "ruin-hall-2": {
@@ -81,6 +87,7 @@ export const ROOM_REGISTRY = {
       { x: 1000, y: 544, statKey: "ruin_husk" },
     ],
     dummySpawns: [],
+    checkpoints: [],
   },
 };
 

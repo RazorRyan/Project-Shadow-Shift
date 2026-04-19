@@ -11,6 +11,9 @@ export const saveManager = {
       roomId: state.roomId ?? "ruin-hall",
       playerHp: state.playerHp ?? 5,
       unlockedAbilities: state.unlockedAbilities ?? [],
+      weaponStage: state.weaponStage ?? 0,
+      visitedRooms: state.visitedRooms ?? [],
+      checkpointId: state.checkpointId ?? null,
       savedAt: Date.now(),
     };
     try {

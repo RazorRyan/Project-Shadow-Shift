@@ -12,11 +12,12 @@
     <aside class="hud-panel">
       <p class="eyebrow">Project Shadow Shift</p>
       <h1>Phaser V2 Sandbox</h1>
-      <p class="subtitle">Phases 1 through 16 completed in this Phaser V2 migration branch, parked outside the active `webjs` build.</p>
+      <p class="subtitle">Phases 1 through 27 completed in this Phaser V2 migration branch, parked outside the active `webjs` build.</p>
 
       <section class="status-card">
         <div><span>Room</span><strong id="roomValue">Ruin Hall</strong></div>
         <div><span>World</span><strong id="worldValue">Light</strong></div>
+        <div><span>HP</span><strong id="hpValue">5 / 5</strong></div>
         <div><span>Element</span><strong id="elementValue">None</strong></div>
         <div><span>Weapon</span><strong id="weaponValue">Shard Blade I</strong></div>
         <div><span>Objective</span><strong id="objectiveValue">Press Enter or click Enter the Ruin</strong></div>
@@ -31,6 +32,9 @@
         <p><kbd>Shift</kbd>: Dash</p>
         <p><kbd>F</kbd>: Attack</p>
         <p><kbd>Q</kbd>: Shadow Swap</p>
+        <p><kbd>E</kbd>: Cycle Element</p>
+        <p><kbd>T</kbd>: Weapon Upgrade</p>
+        <p><kbd>Z</kbd>: Interact / Checkpoint</p>
         <p><kbd>P</kbd>: Save</p>
         <p><kbd>O</kbd>: Load Save</p>
         <p><kbd>H</kbd>: Debug damage</p>
@@ -44,9 +48,9 @@
 
       <div id="startOverlay" class="screen-overlay">
         <div class="screen-panel">
-          <p class="panel-kicker">Phases 1 through 16 completed</p>
+          <p class="panel-kicker">Phases 1 through 27 completed</p>
           <h2>Shadow Shift Phaser V2</h2>
-          <p>Foundation, input, player, combat, enemies, AI, tilemap world, room transitions, save, abilities, double jump, and Shadow Swap are now running in Phaser 3.</p>
+          <p>Foundation, input, player, combat, enemies, AI, tilemap world, room transitions, save, abilities, Shadow Swap, elements, weapon evolution, HUD, checkpoints, NPC dialogue, boss framework, audio, content pipeline, performance, and polish are now running in Phaser 3.</p>
           <button id="startButton" type="button">Enter the Ruin</button>
         </div>
       </div>

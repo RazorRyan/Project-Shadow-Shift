@@ -14,7 +14,15 @@ import { createRoomTransitionSystem } from "../systems/roomTransitionSystem.js";
 import { saveManager } from "../save/saveManager.js";
 import { createAbilitySystem } from "../systems/abilitySystem.js";
 import { createShadowSwapSystem } from "../systems/shadowSwapSystem.js";
-
+import { createElementSystem } from "../systems/elementSystem.js";
+import { ELEMENT_COLORS, getElementMultiplier } from "../data/elementData.js";
+import { createWeaponSystem } from "../systems/weaponSystem.js";
+import { createAudioSystem } from "../systems/audioSystem.js";
+import { createHudManager } from "../ui/hudManager.js";
+import { createCheckpointSystem } from "../world/checkpointSystem.js";
+import { NpcEntity } from "../entities/NpcEntity.js";
+import { createDialogueRenderer } from "../ui/dialogueRenderer.js";
+import { DIALOGUE } from "../data/dialogueData.js";
 const ROOM_MODE_STORAGE_KEY = "shadow-shift-phaser-room-mode";
 
 export class GameScene extends Phaser.Scene {
@@ -95,13 +103,41 @@ export class GameScene extends Phaser.Scene {
     // Phase 11: transition system
     this.transitionSystem = createRoomTransitionSystem();
 
+    // Phase 21: checkpoint system
+    this.checkpointSystem = createCheckpointSystem();
+    this.checkpointSystem.loadVisited(saveManager.load()?.visitedRooms ?? []);
+    this.checkpointSystem.markRoomVisited(this.roomId ?? "ruin-hall");
+    this.activateKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Z);
+
+    // Phase 22: NPC dialogue
+    this.dialogueRenderer = createDialogueRenderer();
+    this.npcs = (this.roomLayout.npcSpawns ?? []).map(cfg => new NpcEntity(this, cfg));
+
     // Phase 15: shadow swap system
     this.swapSystem = createShadowSwapSystem();
     this.swapSystem.onSwap((phase) => this._applyShadowPhase(phase));
 
+    // Phase 17: element system
+    this.elementSystem = createElementSystem();
+    this.elementSystem.onChange((el) => this.ui.setElement(el));
+
+    // Phase 19: weapon system
+    const savedWeaponStage = saveManager.load()?.weaponStage ?? 0;
+    this.weaponSystem = createWeaponSystem(savedWeaponStage);
+    this.weaponSystem.onUpgrade((stage) => this.ui.setWeapon(stage.label));
+    this.ui.setWeapon(this.weaponSystem.getStage().label);
+
+    // Phase 20: HUD manager
+    this.hud = createHudManager(this.ui, this.player, this.elementSystem, this.weaponSystem, this.swapSystem);
+    this.hud.pushAll();
+
+    // Phase 24: audio system
+    this.audio = createAudioSystem(this.sound);
+
     // Phase 12: save / load keys
     this.saveKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.P);
     this.loadKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.O);
+    this.upgradeKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T);
 
     this.attackGraphics = this.add.graphics().setDepth(6);
     this.statusText = this.add.text(24, 76, "Attack sandbox offline", {
@@ -121,7 +157,7 @@ export class GameScene extends Phaser.Scene {
       color: "#f4efe1"
     }).setScrollFactor(0);
 
-    this.add.text(24, 52, "Phases 1 through 16 completed in this branch", {
+    this.add.text(24, 52, "Phases 1 through 27 completed in this branch", {
       fontFamily: "monospace",
       fontSize: "12px",
       color: "#b7bfd6"
@@ -199,7 +235,11 @@ export class GameScene extends Phaser.Scene {
         roomId: this.roomId ?? "ruin-hall",
         playerHp: this.player.getHealth(),
         unlockedAbilities: this.abilities.listUnlocked(),
+        weaponStage: this.weaponSystem.getStageIndex(),
+        visitedRooms: this.checkpointSystem.getVisitedRooms(),
+        checkpointId: this.checkpointSystem.getActive()?.id ?? null,
       });
+      this.audio.onSave();
       this.statusText.setText("Progress saved (P) | Load: O");
     }
     if (Phaser.Input.Keyboard.JustDown(this.loadKey)) {
@@ -207,15 +247,32 @@ export class GameScene extends Phaser.Scene {
       if (saved) {
         this.abilities = createAbilitySystem(saved.unlockedAbilities ?? []);
         this.player.canDoubleJump = this.abilities.has("double_jump");
-        this.statusText.setText(`Loaded | Abilities: ${this.abilities.listUnlocked().join(", ") || "none"}`);
+        const wi = saved.weaponStage ?? 0;
+        while (this.weaponSystem.getStageIndex() < wi) this.weaponSystem.upgradeToNext();
+        this.ui.setWeapon(this.weaponSystem.getStage().label);
+        this.statusText.setText(`Loaded | Weapon: ${this.weaponSystem.getStage().label}`);
       } else {
         this.statusText.setText("No save found");
       }
     }
 
+    // Phase 19: weapon upgrade test
+    if (Phaser.Input.Keyboard.JustDown(this.upgradeKey)) {
+      this.weaponSystem.upgradeToNext();
+      this.audio.onWeaponUp();
+      this.statusText.setText(`Weapon upgraded: ${this.weaponSystem.getStage().label}`);
+    }
+
     // Phase 15: shadow swap
     if (this.inputMap.wasPressed("swap")) {
       this.swapSystem.swap();
+      this.audio.onSwap();
+    }
+
+    // Phase 17: element cycle
+    if (this.inputMap.wasPressed("element")) {
+      this.elementSystem.cycleNext();
+      this.audio.onElement();
     }
 
     this.player.update(delta);
@@ -243,12 +300,41 @@ export class GameScene extends Phaser.Scene {
       this.statusText.setText("Vessel restored at the gate");
     }
 
+    // Phase 22: NPC update / dialogue
+    const interactJustDown = Phaser.Input.Keyboard.JustDown(this.activateKey);
+    if (this.dialogueRenderer.isActive()) {
+      if (interactJustDown || Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE))) {
+        this.dialogueRenderer.advance();
+      }
+    } else {
+      for (const npc of this.npcs ?? []) {
+        const dlgId = npc.update(this.player, interactJustDown);
+        if (dlgId && DIALOGUE[dlgId]) {
+          this.dialogueRenderer.start(DIALOGUE[dlgId]);
+          break;
+        }
+      }
+    }
+
+    // Phase 21: checkpoint activation (Z key)
+    const cpHit = this.checkpointSystem.check(
+      this.player,
+      this.roomLayout.checkpoints ?? [],
+      Phaser.Input.Keyboard.JustDown(this.activateKey)
+    );
+    if (cpHit) {
+      this.audio.onCheckpoint();
+      this.statusText.setText(`Checkpoint activated: ${cpHit.id}`);
+    }
+
     for (const dummy of this.trainingDummies) {
       dummy.update(delta);
     }
     for (const enemy of this.enemies) {
-      enemy.update(delta);
+      // Phase 26: skip AI update for enemies beyond 600px (still update timers/flash)
+      enemy.update(delta, Math.abs(enemy.sprite.x - this.player.sprite.x) > 600);
     }
+    this.hud.update();
     this.updateCombatSandbox(delta);
     this.playerStateText.setText(
       this.player.isDead()
@@ -311,7 +397,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const attackBox = getCurrentAttackBox(this.player, profile);
+    const attackBox = getCurrentAttackBox(this.player, profile, this.weaponSystem.getRangeBonus());
     const slashColor = getSlashColor(profile);
     this.attackGraphics.fillStyle(slashColor, 0.22);
     this.attackGraphics.lineStyle(2, slashColor, 0.85);
@@ -338,17 +424,22 @@ export class GameScene extends Phaser.Scene {
     const eligibleEnemies = this.enemies.filter(e => !this.player.hasHitTarget(e.label + e.sprite.x));
     for (const enemy of resolveAttack(attackBox, eligibleEnemies)) {
       this.player.registerAttackHit(enemy.label + enemy.sprite.x);
-      const hit = buildHitEvent(profile, this.player.facing, getAttackDamage(profile));
+      const elMult = getElementMultiplier(this.elementSystem.getElement(), enemy.stats?.weakness);
+      const rawDamage = this.weaponSystem.applyDamage(getAttackDamage(profile));
+      const finalDamage = elMult > 1 ? Math.ceil(rawDamage * elMult) : rawDamage;
+      const hit = buildHitEvent(profile, this.player.facing, finalDamage);
       const result = enemy.applyHit(hit);
       if (profile.type === "downslash") {
         this.player.sprite.body.setVelocityY(-profile.bounceStrength);
       }
 
-      this.cameras.main.shake(profile.finisher ? 90 : profile.hitTag === "heavy" ? 70 : 50, 0.003);
+      const shakeMs = profile.finisher ? 90 : profile.hitTag === "heavy" ? 70 : 50;
+      this.cameras.main.shake(shakeMs, 0.003);
+      const reactionLabel = elMult > 1 ? ` [WEAK x${elMult.toFixed(2)}]` : "";
       this.statusText.setText(
         result?.defeated
-          ? `${enemy.label} defeated by ${profile.id}`
-          : `${profile.id} hit ${enemy.label} for ${hit.damage}`
+          ? `${enemy.label} defeated by ${profile.id}${reactionLabel}`
+          : `${profile.id} hit ${enemy.label} for ${finalDamage}${reactionLabel}`
       );
     }
   }

@@ -8,6 +8,7 @@ const INPUT_BINDINGS = {
   start: [Phaser.Input.Keyboard.KeyCodes.ENTER, Phaser.Input.Keyboard.KeyCodes.SPACE],
   debugDamage: [Phaser.Input.Keyboard.KeyCodes.H],
   swap: [Phaser.Input.Keyboard.KeyCodes.Q],
+  element: [Phaser.Input.Keyboard.KeyCodes.E],
 };
 
 function anyKey(keys, predicate) {

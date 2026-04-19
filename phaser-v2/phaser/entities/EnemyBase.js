@@ -86,7 +86,7 @@ export class EnemyBase {
     return { defeated: false };
   }
 
-  update(delta) {
+  update(delta, culled = false) {
     this.invulnTimer = Math.max(0, this.invulnTimer - delta);
     this.hurtFlashTimer = Math.max(0, this.hurtFlashTimer - delta);
 
@@ -104,7 +104,10 @@ export class EnemyBase {
         : `${this.label} defeated`
     );
 
-    this.onUpdate(delta);
+    // Phase 26: skip AI logic when culled (out of range)
+    if (!culled) {
+      this.onUpdate(delta);
+    }
   }
 
   destroy() {

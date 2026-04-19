@@ -1,9 +1,17 @@
 export function createDomUiBridge(scene) {
+  /** Hex CSS colors for each element */
+  const ELEMENT_CSS = {
+    None: "#c8d0e8",
+    Fire: "#ff6030",
+    Ice:  "#60d0ff",
+    Wind: "#90ffb0",
+  };
   const hud = {
     room: document.getElementById("roomValue"),
     world: document.getElementById("worldValue"),
     element: document.getElementById("elementValue"),
     weapon: document.getElementById("weaponValue"),
+    hp: document.getElementById("hpValue"),
     objective: document.getElementById("objectiveValue"),
     startOverlay: document.getElementById("startOverlay"),
     startButton: document.getElementById("startButton"),
@@ -59,6 +67,16 @@ export function createDomUiBridge(scene) {
     },
     setWorldPhase(text) {
       hud.world.textContent = text;
+    },
+    setElement(text) {
+      hud.element.textContent = text;
+      hud.element.style.color = ELEMENT_CSS[text] ?? "#c8d0e8";
+    },
+    setWeapon(text) {
+      hud.weapon.textContent = text;
+    },
+    setHp(hp, maxHp) {
+      if (hud.hp) hud.hp.textContent = `${hp} / ${maxHp}`;
     },
   };
 }

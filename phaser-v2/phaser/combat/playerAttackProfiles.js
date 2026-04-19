@@ -67,12 +67,16 @@ export function getAttackProfile(player, mode = "auto") {
   return buildComboAttackProfile(player, COMBO_ATTACK_DEFINITIONS[comboIndex], comboIndex);
 }
 
-export function getCurrentAttackBox(player, profile) {
+export function getCurrentAttackBox(player, profile, rangeBonus = 0) {
   const body = player.sprite.body;
+  const w = profile.width + rangeBonus;
+  const offsetX = player.facing > 0
+    ? (profile.type === "downslash" ? profile.offsetX : profile.offsetX)
+    : profile.type === "downslash" ? profile.offsetX : profile.offsetX - rangeBonus;
   return {
-    x: body.x + profile.offsetX,
+    x: body.x + offsetX,
     y: body.y + profile.offsetY,
-    w: profile.width,
+    w,
     h: profile.height
   };
 }

@@ -12,5 +12,17 @@ export const ENEMY_STATS = {
     tint: 0xb06850,
     invulnMs: 220,
     hurtFlashMs: 130,
+    weakness: "Fire",
+  },
+  ruin_overseer: {
+    label: "Ruin Overseer",
+    maxHp: 80,
+    width: 52,
+    height: 68,
+    textureKey: "enemy-grunt",
+    tint: 0xcc5533,
+    invulnMs: 400,
+    hurtFlashMs: 200,
+    weakness: "Fire",
   },
 };

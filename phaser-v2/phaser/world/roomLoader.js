@@ -12,7 +12,7 @@ export function loadRoom(scene, solids, roomId) {
     return null;
   }
 
-  const { tileSize, tiles, shadowTiles = [], label, spawns, exits = [], enemySpawns = [], dummySpawns = [] } = data;
+  const { tileSize, tiles, shadowTiles = [], label, spawns, exits = [], enemySpawns = [], dummySpawns = [], checkpoints = [], npcSpawns = [] } = data;
 
   // Build solid tiles into existing solids group
   for (let row = 0; row < tiles.length; row++) {
@@ -44,5 +44,5 @@ export function loadRoom(scene, solids, roomId) {
 
   const spawn = spawns?.default ?? spawns?.left ?? { x: 120, y: 544 };
 
-  return { label, spawn, spawns: spawns ?? { default: spawn }, exits, enemySpawns, dummySpawns, shadowGroup };
+  return { label, spawn, spawns: spawns ?? { default: spawn }, exits, enemySpawns, dummySpawns, checkpoints, npcSpawns, shadowGroup };
 }

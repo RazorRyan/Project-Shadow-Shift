@@ -1,4 +1,5 @@
 import { loadRoom } from "./roomLoader.js";
+import { validateRoomContent } from "../helpers/contentLoader.js";
 
 const ROOM_LAYOUTS = {
   presentation: {
@@ -82,17 +83,18 @@ export function spawnRoomLayout(scene, solids, mode = "presentation") {
   }
 
   const layout = getRoomLayout(mode);
+  const validatedLayout = validateRoomContent(layout);
 
-  for (const platform of layout.platforms) {
+  for (const platform of validatedLayout.platforms) {
     createStaticBlock(scene, solids, platform, mode === "test" ? 0x3b4763 : 0x33405a);
   }
 
-  for (const wall of layout.walls) {
+  for (const wall of validatedLayout.walls) {
     createStaticBlock(scene, solids, wall, mode === "test" ? 0x2f3a53 : 0x2b3650);
   }
 
-  addEnvironmentDressings(scene, layout, mode);
-  return layout;
+  addEnvironmentDressings(scene, validatedLayout, mode);
+  return validatedLayout;
 }
 
 function createStaticBlock(scene, solids, rect, tint) {
