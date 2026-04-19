@@ -1118,6 +1118,8 @@ function createInitialState() {
     },
     particles: [],
     slashEffects: [],
+    embers: [],
+    swapFlashTimer: 0,
     player: {
       x: 120,
       y: 540,
@@ -1464,7 +1466,7 @@ function createInitialState() {
       },
       {
         id: "gate",
-        x: 1120,
+        x: 1060,
         y: 548,
         w: 28,
         h: 72,
@@ -2043,6 +2045,8 @@ function performWorldSwap(targetState, reason = "manual") {
         ? `${summary.empoweredEnemies} foe${summary.empoweredEnemies === 1 ? "" : "s"} empowered`
         : `${summary.activeHazards} hazards aligned`;
     showMessage(`World shifted to ${targetState.world} (${swapText})`, reason === "manual" ? 2.3 : 2);
+    state.swapFlashTimer = 0.14;
+    playSwapSound();
   }
 
   return true;
@@ -2115,6 +2119,7 @@ function handleKeyDown(code) {
 
   if (code === "Digit1" && state.abilityUnlocked.FireShift) {
     state.element = "Fire";
+    showMessage("Fire stance active");
   }
   if (code === "Digit2" && state.abilityUnlocked.IceShift) {
     state.element = "Ice";
@@ -2126,6 +2131,7 @@ function handleKeyDown(code) {
   }
   if (code === "Digit0") {
     state.element = "None";
+    showMessage("Element cleared");
   }
 }
 
@@ -2276,6 +2282,19 @@ function restartLevelFromBeginning(message = "The warrior returns to the gate") 
   Object.assign(state, fresh);
   initializeStateRuntime(state);
   applyPersistedProgress(state);
+  // Full restart always revives the boss — saved bossDefeated must not carry over
+  setProgressionFlag(state, "worldFlags", "bossDefeated", false);
+  setProgressionFlag(state, "worldFlags", "bossAwakened", false);
+  state.bossIntroShown = false;
+  for (const enemy of state.enemies) {
+    if (enemy.boss) {
+      enemy.alive = true;
+      enemy.hp = enemy.maxHp;
+      enemy.displayHp = enemy.maxHp;
+      enemy.awakened = false;
+    }
+  }
+  saveProgress();
   state.started = true;
   state.player.hp = state.player.maxHp;
   state.player.displayHp = state.player.maxHp;
@@ -2324,12 +2343,13 @@ function startDash(player, movement = getMovementTuning(state, player)) {
   player.dashCooldown = movement.dashCooldownDuration;
   player.vx = player.facing * movement.dashSpeed;
   player.vy = 0;
+  player.invuln = movement.dashDuration + 0.04;
   player.wallSliding = false;
   player.wallJumpGraceTimer = 0;
   player.jumpCutReady = false;
   spawnImpactParticles(player.x + player.w * 0.5, player.y + player.h * 0.58, "#d8ecff", 5, 0.55);
   applyScreenShake(0.05, 1.4);
-  showMessage("Dash");
+  playDashSound();
 }
 
 function getVerticalAim() {
@@ -2929,6 +2949,8 @@ function updateSimulation(dt) {
   updateSecrets(dt);
   updateGate();
   updateProgressionState();
+  updateEmbers(dt);
+  state.swapFlashTimer = Math.max(0, state.swapFlashTimer - dt);
 }
 
 function updateEnvironmentReactivity(dt) {
@@ -3121,6 +3143,7 @@ function performGroundJump(player, movement) {
   player.onGround = false;
   player.wallSliding = false;
   player.jumpCutReady = true;
+  playJumpSound();
 }
 
 function canWallJump(player) {
@@ -3138,7 +3161,7 @@ function performWallJump(player, movement) {
   player.onWall = false;
   player.wallDirection = 0;
   player.jumpCutReady = true;
-  showMessage("Wall jump");
+  playJumpSound();
 }
 
 function moveHorizontally(player, dt) {
@@ -3158,6 +3181,7 @@ function moveHorizontally(player, dt) {
 
 function moveVertically(player, dt) {
   const movement = getMovementTuning(state, player);
+  const fallVy = player.vy;
   const result = resolveVertical(player, player.vy * dt, getSolids());
   player.y = result.y;
   player.onGround = false;
@@ -3167,6 +3191,30 @@ function moveVertically(player, dt) {
     player.wallSliding = false;
     player.coyoteTimer = movement.coyoteTime;
     player.jumpCutReady = false;
+    if (fallVy > 160) {
+      playLandSound(fallVy);
+      const theme = getRoomVisualTheme(player.x + player.w * 0.5);
+      const dustCount = Math.min(12, 4 + Math.floor(fallVy / 120));
+      for (let i = 0; i < dustCount; i++) {
+        if (state.particles.length >= MAX_PARTICLES) {
+          break;
+        }
+        const angle = (Math.random() - 0.5) * 1.1;
+        const speed = 55 + Math.random() * 110;
+        state.particles.push({
+          x: player.x + player.w * 0.5 + (Math.random() - 0.5) * player.w * 0.7,
+          y: player.y + player.h,
+          vx: Math.cos(angle) * speed * (Math.random() < 0.5 ? 1 : -1),
+          vy: -Math.abs(Math.sin(angle) * speed * 0.35),
+          life: 0.18 + Math.random() * 0.1,
+          maxLife: 0.28,
+          size: 1.5 + Math.random() * 2,
+          gravity: 280,
+          drag: 0.88,
+          color: theme.trim
+        });
+      }
+    }
   } else if (result.ceilingHit) {
     player.vy = 0;
     player.jumpCutReady = false;
@@ -3718,7 +3766,7 @@ function clampEnemyToPatrol(enemy) {
   if (enemy.x <= enemy.left || enemy.x + enemy.w >= enemy.right) {
     enemy.x = clamp(enemy.x, enemy.left, enemy.right - enemy.w);
     flipEnemyPatrolDirection(enemy);
-    brakeEnemy(enemy, 1 / 60, 1.6);
+    enemy.vx = 0;
     setEnemyState(enemy, "idle", enemy.type === "demon" ? 0.16 : enemy.type === "watcher" ? 0.12 : 0.1);
   }
 }
@@ -3938,6 +3986,7 @@ function draw() {
   drawHazards();
   drawPickups();
   drawSecretCaches();
+  drawEmbers();
   drawSlashEffects();
   drawEnemies();
   drawExit();
@@ -3960,6 +4009,14 @@ function draw() {
     drawPuzzleOverlay();
   }
   ctx.restore();
+  if (state.swapFlashTimer > 0) {
+    const flashAlpha = (state.swapFlashTimer / 0.14) * 0.22;
+    ctx.save();
+    ctx.globalAlpha = flashAlpha;
+    ctx.fillStyle = state.world === "Shadow" ? "#a0a8ff" : "#f0e8c8";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  }
   drawDebugStateOverlay();
 }
 
@@ -4753,17 +4810,37 @@ function drawBossShrineArena() {
 }
 
 function drawEclipseBraziers() {
+  const t = performance.now();
   for (const brazier of [
     { x: 680, y: 586 }, { x: 1320, y: 586 }, { x: 2360, y: 586 }, { x: 3560, y: 586 }
   ]) {
     ctx.fillStyle = "rgba(28, 28, 42, 0.92)";
     ctx.fillRect(brazier.x, brazier.y, 18, 28);
-    ctx.fillStyle = "#f0c885";
-    ctx.beginPath();
-    ctx.moveTo(brazier.x + 9, brazier.y - 18);
-    ctx.quadraticCurveTo(brazier.x - 2, brazier.y - 4, brazier.x + 5, brazier.y + 4);
-    ctx.quadraticCurveTo(brazier.x + 11, brazier.y - 8, brazier.x + 9, brazier.y - 18);
-    ctx.fill();
+
+    // Animated flame — three overlapping layers at different phases
+    const layers = [
+      { phase: 0,   freqMul: 1.0,  color: "#f0c885", hScale: 1.0,  wScale: 1.0 },
+      { phase: 1.1, freqMul: 1.3,  color: "#ff9a40", hScale: 0.78, wScale: 0.7 },
+      { phase: 2.4, freqMul: 0.85, color: "#fff0b0", hScale: 0.55, wScale: 0.5 }
+    ];
+    for (const layer of layers) {
+      const flicker = Math.sin(t * 0.0082 * layer.freqMul + brazier.x * 0.04 + layer.phase);
+      const h = (18 + flicker * 5) * layer.hScale;
+      const lx = brazier.x + 9;
+      const ly = brazier.y;
+      ctx.fillStyle = layer.color;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly - h);
+      ctx.quadraticCurveTo(
+        lx - 6 * layer.wScale + flicker * 3, ly - h * 0.35,
+        lx - 4 * layer.wScale,               ly + 4
+      );
+      ctx.quadraticCurveTo(
+        lx + 7 * layer.wScale - flicker * 2, ly - h * 0.5,
+        lx,                                   ly - h
+      );
+      ctx.fill();
+    }
   }
 }
 
@@ -4836,6 +4913,11 @@ function drawHangingChain(x, y, length, color) {
 }
 
 function drawLantern(x, y, color, glowAlpha) {
+  const flicker = Math.sin(performance.now() * 0.0034 + x * 0.008) * 0.5
+    + Math.sin(performance.now() * 0.0071 + x * 0.013) * 0.5;
+  const glowRadius = 42 + flicker * 4;
+  const innerAlpha = glowAlpha * 2.5 + flicker * 0.03;
+
   ctx.save();
   ctx.strokeStyle = "rgba(188, 194, 214, 0.26)";
   ctx.lineWidth = 2;
@@ -4843,12 +4925,12 @@ function drawLantern(x, y, color, glowAlpha) {
   ctx.moveTo(x, y - 48);
   ctx.lineTo(x, y - 10);
   ctx.stroke();
-  const glow = ctx.createRadialGradient(x, y, 2, x, y, 42);
-  glow.addColorStop(0, `${hexToRgba(color, glowAlpha * 2.5)}`);
+  const glow = ctx.createRadialGradient(x, y, 2, x, y, glowRadius);
+  glow.addColorStop(0, `${hexToRgba(color, innerAlpha)}`);
   glow.addColorStop(1, `${hexToRgba(color, 0)}`);
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(x, y, 42, 0, Math.PI * 2);
+  ctx.arc(x, y, glowRadius, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -6275,6 +6357,104 @@ function scheduleThemePhrase() {
 
   for (const note of subDrops) {
     playSubRumble(note.f, now + note.t, note.d, note.g);
+  }
+}
+
+function playJumpSound() {
+  if (!audioContext) {
+    return;
+  }
+  const now = audioContext.currentTime;
+  playFilteredNoiseBurst(now, 0.06, 0.016, 900, "highpass");
+  playBladeTone(210, now, 0.07, 0.011);
+}
+
+function playLandSound(fallVy) {
+  if (!audioContext) {
+    return;
+  }
+  const now = audioContext.currentTime;
+  const intensity = clamp((fallVy - 160) / 600, 0, 1);
+  playFilteredNoiseBurst(now, 0.1 + intensity * 0.08, 0.022 + intensity * 0.016, 220, "lowpass");
+  if (intensity > 0.3) {
+    playBassTone(80, now, 0.18, 0.018 + intensity * 0.012);
+  }
+}
+
+function playDashSound() {
+  if (!audioContext) {
+    return;
+  }
+  const now = audioContext.currentTime;
+  playFilteredNoiseBurst(now, 0.11, 0.022, 1400, "bandpass");
+  playBladeTone(480, now, 0.08, 0.016);
+  playBladeTone(720, now + 0.02, 0.06, 0.011);
+}
+
+function playSwapSound() {
+  if (!audioContext) {
+    return;
+  }
+  const now = audioContext.currentTime;
+  const osc = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(90, now);
+  osc.frequency.exponentialRampToValueAtTime(55, now + 0.5);
+  gain.gain.setValueAtTime(0.0001, now);
+  gain.gain.exponentialRampToValueAtTime(0.028, now + 0.06);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.5);
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.start(now);
+  osc.stop(now + 0.55);
+  playFilteredNoiseBurst(now, 0.38, 0.016, 320, "bandpass");
+  playGhostBell(277.18, now + 0.05, 1.4, 0.003);
+}
+
+const BRAZIER_WORLD_POSITIONS = [
+  { x: 689, y: 576 }, { x: 1329, y: 576 }, { x: 2369, y: 576 }, { x: 3569, y: 576 }
+];
+const MAX_EMBERS = 30;
+
+function updateEmbers(dt) {
+  for (let i = state.embers.length - 1; i >= 0; i--) {
+    const ember = state.embers[i];
+    ember.life -= dt;
+    if (ember.life <= 0) {
+      state.embers.splice(i, 1);
+      continue;
+    }
+    ember.x += ember.vx * dt;
+    ember.y += ember.vy * dt;
+    ember.vx *= 0.985;
+  }
+
+  if (state.embers.length < MAX_EMBERS && Math.random() < 0.45) {
+    const pos = BRAZIER_WORLD_POSITIONS[Math.floor(Math.random() * BRAZIER_WORLD_POSITIONS.length)];
+    state.embers.push({
+      x: pos.x + (Math.random() - 0.5) * 10,
+      y: pos.y - 4 + Math.random() * 4,
+      vx: (Math.random() - 0.5) * 16,
+      vy: -(18 + Math.random() * 24),
+      life: 3 + Math.random() * 3,
+      maxLife: 6,
+      size: 1 + Math.random() * 0.8,
+      color: Math.random() < 0.6 ? "#ffb040" : "#ff7820"
+    });
+  }
+}
+
+function drawEmbers() {
+  for (const ember of state.embers) {
+    const alpha = clamp(ember.life / ember.maxLife, 0, 1) * 0.52;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ember.color;
+    ctx.beginPath();
+    ctx.arc(ember.x, ember.y, ember.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 }
 

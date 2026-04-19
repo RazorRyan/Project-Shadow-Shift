@@ -6,16 +6,10 @@ param(
 $ErrorActionPreference = "Stop"
 
 $webRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$projectRoot = Split-Path -Parent $webRoot
-$serverScript = Join-Path $projectRoot "serve-web.ps1"
 $url = "http://localhost:$Port/"
 
 if (-not (Test-Path $webRoot)) {
   throw "Web folder not found at '$webRoot'."
-}
-
-if (-not (Test-Path $serverScript)) {
-  throw "Server script not found at '$serverScript'."
 }
 
 $existingListener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
@@ -25,37 +19,29 @@ if ($existingListener) {
   Write-Host "Shadow Shift web app is already running on $url" -ForegroundColor Yellow
 } else {
   Write-Host "Starting Shadow Shift web app on $url" -ForegroundColor Cyan
-  $process = Start-Process powershell `
-    -ArgumentList @(
-      "-NoProfile",
-      "-ExecutionPolicy", "Bypass",
-      "-File", $serverScript,
-      "-Root", $webRoot
-    ) `
-    -WorkingDirectory $projectRoot `
+  $process = Start-Process python `
+    -ArgumentList @("-m", "http.server", $Port) `
+    -WorkingDirectory $webRoot `
     -WindowStyle Hidden `
     -PassThru
 
-  Start-Sleep -Seconds 2
-
   $verified = $false
-  for ($attempt = 0; $attempt -lt 10; $attempt++) {
+  for ($attempt = 0; $attempt -lt 15; $attempt++) {
+    Start-Sleep -Milliseconds 400
     try {
-      $response = Invoke-WebRequest -Uri $url -UseBasicParsing -Headers @{ Host = "localhost:$Port" } -TimeoutSec 2
+      $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2
       if ($response.StatusCode -eq 200) {
         $verified = $true
         break
       }
-    } catch {
-      Start-Sleep -Milliseconds 300
-    }
+    } catch { }
   }
 
   if (-not $verified) {
-    throw "Server process started but did not respond successfully on $url"
+    throw "Server process started but did not respond on $url"
   }
 
-  Write-Host "Server started successfully. PID: $($process.Id)" -ForegroundColor Green
+  Write-Host "Server started (PID: $($process.Id)). Press Ctrl+C in that window to stop." -ForegroundColor Green
 }
 
 if (-not $NoBrowser) {

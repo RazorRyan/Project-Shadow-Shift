@@ -15,7 +15,7 @@
     riseGravityMultiplier: 0.92,
     apexGravityMultiplier: 0.72,
     apexVelocityWindow: 85,
-    fallGravityMultiplier: 1.28,
+    fallGravityMultiplier: 1.55,
     terminalFallSpeed: 980,
     wallSlideEntrySpeed: 45,
     wallSlideSpeed: 170,

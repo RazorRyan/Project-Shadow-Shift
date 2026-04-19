@@ -4,15 +4,18 @@ export class TrainingDummy {
     this.label = label;
     this.maxHp = 6;
     this.hp = this.maxHp;
+    this.spawnY = y;
     this.invulnTimer = 0;
     this.respawnTimer = 0;
     this.hurtFlashTimer = 0;
+    this.idleOffset = Math.random() * Math.PI * 2;
 
     this.sprite = scene.physics.add.sprite(x, y, "training-dummy");
     this.sprite.setDisplaySize(56, 86);
     this.sprite.setSize(56, 86);
     this.sprite.setImmovable(true);
     this.sprite.body.setAllowGravity(false);
+    this.sprite.setTint(label === "Guard Shell" ? 0xb8c8ff : 0xe2c8a0);
 
     this.healthText = scene.add.text(x, y - 78, `${this.label} HP ${this.hp}/${this.maxHp}`, {
       fontFamily: "monospace",
@@ -23,6 +26,10 @@ export class TrainingDummy {
 
   isAlive() {
     return this.hp > 0;
+  }
+
+  canBeHit() {
+    return this.isAlive() && this.invulnTimer <= 0;
   }
 
   getHurtbox() {
@@ -38,18 +45,23 @@ export class TrainingDummy {
   update(delta) {
     this.invulnTimer = Math.max(0, this.invulnTimer - delta);
     this.hurtFlashTimer = Math.max(0, this.hurtFlashTimer - delta);
+    this.idleOffset += delta * 0.0024;
 
     if (!this.isAlive()) {
       this.respawnTimer = Math.max(0, this.respawnTimer - delta);
       if (this.respawnTimer <= 0) {
         this.hp = this.maxHp;
         this.sprite.setAlpha(1);
-        this.sprite.setTint(0xffffff);
+        this.sprite.setTint(this.label === "Guard Shell" ? 0xb8c8ff : 0xe2c8a0);
       }
     }
 
     if (this.hurtFlashTimer <= 0 && this.isAlive()) {
-      this.sprite.setTint(0xffffff);
+      this.sprite.setTint(this.label === "Guard Shell" ? 0xb8c8ff : 0xe2c8a0);
+    }
+
+    if (this.isAlive()) {
+      this.sprite.y = this.spawnY + Math.sin(this.idleOffset) * 2.6;
     }
 
     this.healthText.setPosition(this.sprite.x, this.sprite.y - 78);

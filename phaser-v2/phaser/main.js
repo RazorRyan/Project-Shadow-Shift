@@ -1,5 +1,3 @@
-import { gameConfig } from "./config/gameConfig.js";
-import { GameScene } from "./scenes/GameScene.js";
+import { createGame } from "./core/createGame.js";
 
-gameConfig.scene = [GameScene];
-new Phaser.Game(gameConfig);
+createGame();
