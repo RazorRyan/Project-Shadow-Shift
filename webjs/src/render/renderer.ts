@@ -599,7 +599,7 @@ export function createRenderer(
   }
 
   function drawPlatformHangers(x: number, y: number, w: number, h: number, theme: any): void {
-    ctx.strokeStyle = hexToRgba(theme.growth, 0.9);
+    ctx.strokeStyle = hexToRgba(theme.growth, 0.65);
     ctx.lineWidth = 2;
     const maxHangers = Math.min(4, Math.floor(w / 64));
     for (let i = 0; i < maxHangers; i++) {
@@ -628,19 +628,19 @@ export function createRenderer(
   function getRoomVisualTheme(x: number): any {
     if (x < 960) return {
       id: "outerRampart", top: "#7a7f8a", face: "#4e5561", depth: "#272c33",
-      trim: "#9da5b1", accent: "rgba(206, 214, 228, 0.18)", growth: "rgba(173, 188, 142, 0.18)"
+      trim: "#9da5b1", accent: "rgba(206, 214, 228, 0.18)", growth: "#adbc8e"
     };
     if (x < 1900) return {
       id: "ashGate", top: "#8c786a", face: "#5b473f", depth: "#2b2220",
-      trim: "#b79d86", accent: "rgba(255, 206, 160, 0.14)", growth: "rgba(172, 101, 72, 0.16)"
+      trim: "#b79d86", accent: "rgba(255, 206, 160, 0.14)", growth: "#ac6548"
     };
     if (x < 3300) return {
       id: "umbralGalleries", top: "#707493", face: "#42465e", depth: "#1e2233",
-      trim: "#98a0d4", accent: "rgba(188, 197, 255, 0.16)", growth: "rgba(94, 106, 162, 0.18)"
+      trim: "#98a0d4", accent: "rgba(188, 197, 255, 0.16)", growth: "#5e6aa2"
     };
     return {
       id: "eclipseThrone", top: "#8e829d", face: "#4b4458", depth: "#1c1924",
-      trim: "#d2c1dc", accent: "rgba(236, 221, 255, 0.14)", growth: "rgba(161, 145, 184, 0.16)"
+      trim: "#d2c1dc", accent: "rgba(236, 221, 255, 0.14)", growth: "#a191b8"
     };
   }
 
@@ -743,14 +743,21 @@ export function createRenderer(
       ctx.strokeStyle = attackPulse > 0 ? "rgba(255, 244, 214, 0.82)" : "rgba(235, 222, 184, 0.22)";
       ctx.lineWidth = attackPulse > 0 ? 2.8 : 2;
       ctx.strokeRect(x + 4, y + 6, w - 8, h - 12);
-      ctx.fillStyle = COLORS.pickupDash;
+      // Lightning bolt — proper closed 7-point polygon
+      const bx = x + w * 0.5;
+      ctx.fillStyle = hexToRgba(COLORS.pickupDash, 0.88);
       ctx.beginPath();
-      ctx.moveTo(x + w * 0.5, y + 12);
-      ctx.lineTo(x + w * 0.75, y + 30);
-      ctx.lineTo(x + w * 0.52, y + 30);
-      ctx.lineTo(x + w * 0.62, y + 52);
+      ctx.moveTo(bx - 7, y + 18);   // top-left
+      ctx.lineTo(bx + 9, y + 18);   // top-right
+      ctx.lineTo(bx + 1, y + 76);   // inner-right (diagonal)
+      ctx.lineTo(bx + 11, y + 76);  // right notch
+      ctx.lineTo(bx - 1, y + 136);  // bottom tip
+      ctx.lineTo(bx - 11, y + 80);  // left notch
+      ctx.lineTo(bx - 1, y + 80);   // inner-left (diagonal)
+      ctx.closePath();
+      ctx.fill();
       ctx.strokeStyle = hexToRgba("#fff8dc", 0.66);
-      ctx.lineWidth = 2.4;
+      ctx.lineWidth = 2;
       ctx.stroke();
     } else {
       ctx.strokeStyle = COLORS.gateOpen;
@@ -805,13 +812,14 @@ export function createRenderer(
     if (kind === "dash") {
       ctx.fillStyle = hexToRgba(color, 0.95);
       ctx.beginPath();
-      ctx.moveTo(centerX - 10, centerY - 8);
-      ctx.lineTo(centerX + 1, centerY - 11);
-      ctx.lineTo(centerX - 1, centerY - 1);
-      ctx.lineTo(centerX + 8, centerY - 1);
-      ctx.lineTo(centerX - 4, centerY + 12);
-      ctx.lineTo(centerX - 2, centerY + 3);
-      ctx.lineTo(centerX - 11, centerY + 3);
+      // Classic symmetric lightning bolt (7 points)
+      ctx.moveTo(centerX - 5, centerY - 12); // top-left
+      ctx.lineTo(centerX + 7, centerY - 12); // top-right
+      ctx.lineTo(centerX + 1, centerY - 1);  // inner-right (diagonal in)
+      ctx.lineTo(centerX + 8, centerY - 1);  // right notch
+      ctx.lineTo(centerX - 1, centerY + 13); // bottom tip
+      ctx.lineTo(centerX - 8, centerY + 1);  // left notch
+      ctx.lineTo(centerX - 1, centerY + 1);  // inner-left (diagonal back)
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -1524,15 +1532,32 @@ export function createRenderer(
       { x: 3400, y: 100, w: 220, h: 320, top: "throne" }
     ];
     for (const structure of structures) {
-      const color = _state.world === "Light" ? "rgba(18, 22, 36, 0.32)" : "rgba(12, 14, 28, 0.4)";
-      ctx.fillStyle = color;
+      const isLight = _state.world === "Light";
+      // Body — more opaque so structures read as solid silhouettes
+      ctx.fillStyle = isLight ? "rgba(18, 22, 36, 0.55)" : "rgba(12, 14, 28, 0.65)";
       ctx.fillRect(structure.x, structure.y, structure.w, structure.h);
-      ctx.fillStyle = _state.world === "Light" ? "rgba(182, 216, 255, 0.08)" : "rgba(144, 164, 255, 0.11)";
-      ctx.fillRect(structure.x + 10, structure.y + 10, 10, structure.h - 20);
-      ctx.fillRect(structure.x + structure.w - 20, structure.y + 10, 10, structure.h - 20);
+      // Edge columns — raised opacity so the pillar detail is visible
+      ctx.fillStyle = isLight ? "rgba(182, 216, 255, 0.28)" : "rgba(144, 164, 255, 0.32)";
+      ctx.fillRect(structure.x + 8, structure.y + 12, 12, structure.h - 24);
+      ctx.fillRect(structure.x + structure.w - 20, structure.y + 12, 12, structure.h - 24);
+      // Horizontal banding — reads as floor-levels on the tower
+      ctx.fillStyle = isLight ? "rgba(200, 220, 255, 0.10)" : "rgba(160, 175, 255, 0.12)";
+      for (let band = 0; band < 4; band++) {
+        const by = structure.y + Math.floor(structure.h * (band + 1) / 5);
+        ctx.fillRect(structure.x + 4, by, structure.w - 8, 3);
+      }
+      // Window slots — a row of small dark recesses
+      ctx.fillStyle = "rgba(6, 8, 16, 0.72)";
+      const winCols = Math.max(2, Math.floor((structure.w - 32) / 28));
+      for (let wi = 0; wi < winCols; wi++) {
+        const wx = structure.x + 20 + wi * Math.floor((structure.w - 40) / Math.max(1, winCols - 1));
+        ctx.fillRect(wx, structure.y + Math.floor(structure.h * 0.28), 10, 14);
+        ctx.fillRect(wx, structure.y + Math.floor(structure.h * 0.56), 10, 14);
+      }
       if (structure.top === "chain") {
-        drawHangingChain(structure.x + structure.w * 0.5, structure.y - 70, 96, "rgba(160, 168, 195, 0.18)");
+        drawHangingChain(structure.x + structure.w * 0.5, structure.y - 70, 96, "rgba(160, 168, 195, 0.32)");
       } else if (structure.top === "spire") {
+        ctx.fillStyle = isLight ? "rgba(18, 22, 36, 0.55)" : "rgba(12, 14, 28, 0.65)";
         ctx.beginPath();
         ctx.moveTo(structure.x + structure.w * 0.5, structure.y - 56);
         ctx.lineTo(structure.x + 16, structure.y + 6);
@@ -1540,11 +1565,13 @@ export function createRenderer(
         ctx.closePath();
         ctx.fill();
       } else if (structure.top === "fortress") {
+        ctx.fillStyle = isLight ? "rgba(18, 22, 36, 0.55)" : "rgba(12, 14, 28, 0.65)";
         ctx.fillRect(structure.x + 24, structure.y - 42, structure.w - 48, 46);
         for (let i = 0; i < 3; i++) {
           ctx.fillRect(structure.x + 20 + i * (structure.w / 3), structure.y - 16, 16, 18);
         }
       } else if (structure.top === "throne") {
+        ctx.fillStyle = isLight ? "rgba(18, 22, 36, 0.55)" : "rgba(12, 14, 28, 0.65)";
         ctx.beginPath();
         ctx.moveTo(structure.x + 24, structure.y + 22);
         ctx.lineTo(structure.x + structure.w * 0.5, structure.y - 44);
@@ -1665,11 +1692,19 @@ export function createRenderer(
   }
 
   function drawBrokenColumn(x: number, y: number, w: number, h: number): void {
-    ctx.fillStyle = "rgba(34, 38, 48, 0.46)";
+    ctx.fillStyle = "rgba(34, 38, 48, 0.72)";
     ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = "rgba(97, 108, 124, 0.18)";
-    ctx.fillRect(x + 5, y + 10, 5, h - 18);
-    ctx.fillRect(x + w - 10, y + 10, 5, h - 18);
+    // Edge highlights — visible pillar fluting
+    ctx.fillStyle = "rgba(97, 108, 124, 0.42)";
+    ctx.fillRect(x + 4, y + 10, 5, h - 18);
+    ctx.fillRect(x + w - 9, y + 10, 5, h - 18);
+    // Horizontal stone seams
+    ctx.fillStyle = "rgba(60, 70, 90, 0.60)";
+    for (let band = 1; band < 4; band++) {
+      ctx.fillRect(x, y + Math.floor(h * band / 4), w, 2);
+    }
+    // Broken cap (triangle facing up)
+    ctx.fillStyle = "rgba(34, 38, 48, 0.72)";
     ctx.beginPath();
     ctx.moveTo(x - 4, y + 18);
     ctx.lineTo(x + w * 0.5, y - 12);
