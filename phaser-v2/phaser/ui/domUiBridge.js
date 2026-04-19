@@ -11,7 +11,10 @@ export function createDomUiBridge(scene, debug = false) {
     world: document.getElementById("worldValue"),
     element: document.getElementById("elementValue"),
     weapon: document.getElementById("weaponValue"),
+    map: document.getElementById("mapValue"),
+    checkpoint: document.getElementById("checkpointValue"),
     hp: document.getElementById("hpValue"),
+    hpMeterFill: document.getElementById("hpMeterFill"),
     objective: document.getElementById("objectiveValue"),
     startOverlay: document.getElementById("startOverlay"),
     startButton: document.getElementById("startButton"),
@@ -27,7 +30,7 @@ export function createDomUiBridge(scene, debug = false) {
   hud.world.textContent = "Light";
   hud.element.textContent = "None";
   hud.weapon.textContent = "Shard Blade I";
-  hud.objective.textContent = "Press Enter or click Enter the Ruin";
+  hud.objective.textContent = "Reach the Dash Core";
   hud.touchHud.classList.add("hidden");
 
   const tryStart = () => {
@@ -53,13 +56,13 @@ export function createDomUiBridge(scene, debug = false) {
   });
 
   return {
-    hideStartOverlay() {
+    hideStartOverlay(objectiveText = "Reach the Dash Core") {
       hud.startOverlay.classList.add("hidden");
-      hud.objective.textContent = "Movement + combat sandbox: jump, dash, slash";
+      hud.objective.textContent = objectiveText;
     },
     showStartOverlay() {
       hud.startOverlay.classList.remove("hidden");
-      hud.objective.textContent = "Press Enter or click Enter the Ruin";
+      hud.objective.textContent = "Reach the Dash Core";
     },
     setObjective(text) {
       hud.objective.textContent = text;
@@ -72,16 +75,37 @@ export function createDomUiBridge(scene, debug = false) {
     },
     setWorldPhase(text) {
       hud.world.textContent = text;
+      hud.world.dataset.phase = text.toLowerCase();
     },
     setElement(text) {
       hud.element.textContent = text;
       hud.element.style.color = ELEMENT_CSS[text] ?? "#c8d0e8";
+      hud.element.dataset.element = text;
     },
     setWeapon(text) {
       hud.weapon.textContent = text;
+      const tierMatch = text.match(/(\d+)/);
+      hud.weapon.dataset.weaponTier = tierMatch ? tierMatch[1] : "0";
+    },
+    setMapSummary(text) {
+      if (hud.map) {
+        hud.map.textContent = text;
+      }
+    },
+    setCheckpoint(text) {
+      if (hud.checkpoint) {
+        hud.checkpoint.textContent = text;
+      }
     },
     setHp(hp, maxHp) {
-      if (hud.hp) hud.hp.textContent = `${hp} / ${maxHp}`;
+      if (hud.hp) {
+        hud.hp.textContent = `${hp} / ${maxHp}`;
+      }
+      if (hud.hpMeterFill) {
+        const ratio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
+        hud.hpMeterFill.style.width = `${ratio * 100}%`;
+        hud.hpMeterFill.dataset.health = ratio <= 0.34 ? "low" : ratio <= 0.67 ? "mid" : "high";
+      }
     },
   };
 }

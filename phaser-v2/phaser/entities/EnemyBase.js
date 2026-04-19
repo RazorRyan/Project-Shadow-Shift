@@ -43,6 +43,17 @@ export class EnemyBase {
       fontSize: "11px",
       color: "#c8d0e8",
     }).setOrigin(0.5, 1);
+    this.alertText = scene.add.text(x, y - this.stats.height * 0.5 - 38, "", {
+      fontFamily: "monospace",
+      fontSize: "20px",
+      fontStyle: "bold",
+      color: "#ffd9a1",
+      stroke: "#140d08",
+      strokeThickness: 4,
+    }).setOrigin(0.5).setVisible(false);
+    this._lastDisplayName = this.label;
+    this._alertLabel = "";
+    this._alertColor = "#ffd9a1";
   }
 
   isAlive() {
@@ -67,10 +78,12 @@ export class EnemyBase {
     this.sprite.setTint(this.stats.tint);
     this.sprite.setPosition(this.spawnX, this.spawnY);
     this.sprite.body.setVelocity(0, 0);
+    this.clearAlert();
   }
 
   revive() {
     this.resetCombatState();
+    this._lastDisplayName = "";
     this.onRevive();
   }
 
@@ -121,7 +134,19 @@ export class EnemyBase {
       this.sprite.x,
       this.sprite.y - this.stats.height * 0.5 - 4
     );
-    this.nameText.setText(this.getDisplayName());
+    this.alertText.setPosition(
+      this.sprite.x,
+      this.sprite.y - this.stats.height * 0.5 - 28
+    );
+    const displayName = this.getDisplayName();
+    if (displayName !== this._lastDisplayName) {
+      this.nameText.setText(displayName);
+      this._lastDisplayName = displayName;
+    }
+    if (this.alertText.visible) {
+      const pulse = 1 + Math.sin(this.scene.time.now / 55) * 0.08;
+      this.alertText.setScale(pulse);
+    }
 
     // Phase 26: skip AI logic when culled (out of range)
     if (!culled) {
@@ -132,6 +157,27 @@ export class EnemyBase {
   destroy() {
     this.sprite.destroy();
     this.nameText.destroy();
+    this.alertText.destroy();
+  }
+
+  setAlert(label, color = "#ffd9a1") {
+    if (label !== this._alertLabel) {
+      this.alertText.setText(label);
+      this._alertLabel = label;
+    }
+    if (color !== this._alertColor) {
+      this.alertText.setColor(color);
+      this._alertColor = color;
+    }
+    this.alertText.setVisible(Boolean(label));
+  }
+
+  clearAlert() {
+    this._alertLabel = "";
+    this._alertColor = "#ffd9a1";
+    this.alertText.setText("");
+    this.alertText.setVisible(false);
+    this.alertText.setScale(1);
   }
 
   // --- overridable hooks ---
@@ -146,6 +192,8 @@ export class EnemyBase {
   // eslint-disable-next-line no-unused-vars
   onDefeat(_hit) {}
   onRevive() {}
+  // eslint-disable-next-line no-unused-vars
+  onWorldPhaseChanged(_phase) {}
   // eslint-disable-next-line no-unused-vars
   onUpdate(_delta) {}
 }

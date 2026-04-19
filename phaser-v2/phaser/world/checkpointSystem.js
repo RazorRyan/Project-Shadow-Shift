@@ -24,6 +24,11 @@ export function createCheckpointSystem() {
       return activeCheckpoint;
     },
 
+    restoreActive(checkpointId, checkpoints = []) {
+      activeCheckpoint = checkpoints.find(cp => cp.id === checkpointId) ?? null;
+      return activeCheckpoint;
+    },
+
     /**
      * Check whether the player is in a checkpoint zone.
      * @param {object} player — has sprite.body

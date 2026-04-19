@@ -8,25 +8,25 @@
 - [x] 06 phase player state
 - [x] 07 phase combat framework
 - [x] 08 phase enemy base
-- [ ] 09 phase enemy ai
-- [ ] 10 phase tilemap world
-- [ ] 11 phase room transitions
-- [ ] 12 phase save system
-- [ ] 13 phase ability system
-- [ ] 14 phase movement abilities
-- [ ] 15 phase shadow swap
-- [ ] 16 phase shadow swap integration
-- [ ] 17 phase element system
-- [ ] 18 phase element interactions
-- [ ] 19 phase weapon evolution
-- [ ] 20 phase ui integration
-- [ ] 21 phase map checkpoints
-- [ ] 22 phase npc dialogue
-- [ ] 23 phase boss framework
-- [ ] 24 phase audio system
-- [ ] 25 phase content pipeline
-- [ ] 26 phase performance
-- [ ] 27 phase polish
+- [x] 09 phase enemy ai
+- [x] 10 phase tilemap world
+- [x] 11 phase room transitions
+- [x] 12 phase save system
+- [x] 13 phase ability system
+- [x] 14 phase movement abilities
+- [x] 15 phase shadow swap
+- [x] 16 phase shadow swap integration
+- [x] 17 phase element system
+- [x] 18 phase element interactions
+- [x] 19 phase weapon evolution
+- [x] 20 phase ui integration
+- [x] 21 phase map checkpoints
+- [x] 22 phase npc dialogue
+- [x] 23 phase boss framework
+- [x] 24 phase audio system
+- [x] 25 phase content pipeline
+- [x] 26 phase performance
+- [x] 27 phase polish
 
 ## Operator loop
 - Run one phase

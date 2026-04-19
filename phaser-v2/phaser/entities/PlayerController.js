@@ -71,7 +71,11 @@ export class PlayerController {
     this.queuedAttack = false;
     this.activeAttackProfile = null;
     this.attackTargetIds = new Set();
+    this.weaponSystem = null;
+    this.pendingAudioCues = [];
+    this.canDash = true;
     this.canDoubleJump = false;
+    this.canWallJump = true;
     this.airJumpsUsed = 0;
 
     this.sprite = scene.physics.add.sprite(x, y, "player-block");
@@ -109,8 +113,23 @@ export class PlayerController {
     return this.state.maxHp;
   }
 
+  setHealth(hp) {
+    const nextHp = Phaser.Math.Clamp(hp, 1, this.state.maxHp);
+    this.state.hp = nextHp;
+    this.state.dead = false;
+    this.state.pendingRespawn = false;
+    this.state.respawnTimer = 0;
+    this.state.hurtTimer = 0;
+    this.state.invulnerabilityTimer = 0;
+    this.sprite.setAlpha(1);
+  }
+
+  setWeaponSystem(weaponSystem) {
+    this.weaponSystem = weaponSystem;
+  }
+
   startDash() {
-    if (this.isDead() || this.dashCooldown > 0 || this.dashTimer > 0 || this.attackTimer > 0) {
+    if (!this.canDash || this.isDead() || this.dashCooldown > 0 || this.dashTimer > 0 || this.attackTimer > 0) {
       return;
     }
 
@@ -122,6 +141,7 @@ export class PlayerController {
     this.jumpCutReady = false;
     this.sprite.body.setAllowGravity(false);
     this.sprite.body.setVelocity(this.facing * this.config.dashSpeed, 0);
+    this.pendingAudioCues.push("dash");
   }
 
   resetTo(x, y) {
@@ -158,6 +178,7 @@ export class PlayerController {
     this.activeAttackProfile = null;
     this.attackTargetIds.clear();
     this.airJumpsUsed = 0;
+    this.pendingAudioCues.length = 0;
     resetPlayerState(this.state);
     this.presentation.update(0);
   }
@@ -234,6 +255,7 @@ export class PlayerController {
 
     const profile = getAttackProfile(this, mode);
     this.commitAttackProfile(profile);
+    this.pendingAudioCues.push("attack");
     return true;
   }
 
@@ -253,6 +275,12 @@ export class PlayerController {
     const impact = this.pendingLandingImpact;
     this.pendingLandingImpact = null;
     return impact;
+  }
+
+  consumeAudioCues() {
+    const cues = [...this.pendingAudioCues];
+    this.pendingAudioCues.length = 0;
+    return cues;
   }
 
   update(delta) {
@@ -348,7 +376,8 @@ export class PlayerController {
       this.jumpCutReady = true;
       this.wallSliding = false;
       this.airJumpsUsed = 0;
-    } else if (this.jumpBufferTimer > 0 && this.wallJumpGraceTimer > 0 && this.lastWallDirection !== 0) {
+      this.pendingAudioCues.push("jump");
+    } else if (this.jumpBufferTimer > 0 && this.canWallJump && this.wallJumpGraceTimer > 0 && this.lastWallDirection !== 0) {
       body.setVelocityX(-this.lastWallDirection * this.config.wallJumpHorizontalSpeed);
       body.setVelocityY(-this.config.jumpForce * this.config.wallJumpVerticalMultiplier);
       this.jumpBufferTimer = 0;
@@ -357,11 +386,13 @@ export class PlayerController {
       this.wallSliding = false;
       this.jumpCutReady = true;
       this.airJumpsUsed = 0;
+      this.pendingAudioCues.push("jump");
     } else if (this.jumpBufferTimer > 0 && this.canDoubleJump && this.airJumpsUsed < 1 && !this.isGrounded() && this.dashTimer <= 0) {
       body.setVelocityY(-this.config.jumpForce * 0.86);
       this.jumpBufferTimer = 0;
       this.airJumpsUsed = 1;
       this.jumpCutReady = true;
+      this.pendingAudioCues.push("jump");
     }
 
     if (this.wallSliding) {

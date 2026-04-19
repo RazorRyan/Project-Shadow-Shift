@@ -1,20 +1,23 @@
 import { EnemyBase } from "./EnemyBase.js";
 import { RUIN_HUSK_AI } from "../data/enemyAiConfig.js";
 import { boxesOverlap } from "../combat/combatResolver.js";
+import { SHADOW_SWAP_PHASES } from "../data/shadowSwapConfig.js";
 
 const AI = { IDLE: "idle", PATROL: "patrol", CHASE: "chase", ATTACK: "attack", RECOVER: "recover" };
 
 export class RuinHusk extends EnemyBase {
-  constructor(scene, x, y, player) {
-    super(scene, x, y, "ruin_husk");
+  constructor(scene, x, y, player, statKey = "ruin_husk") {
+    super(scene, x, y, statKey);
     this.player = player;
     this.spawnX = x;
+    this.worldPhase = SHADOW_SWAP_PHASES.LIGHT;
     this.aiState = AI.IDLE;
     this.stateTimer = RUIN_HUSK_AI.idleMs;
     this.patrolDir = 1;
     this._attackPhase = "telegraph";
     this._attackTimer = 0;
     this._hitPlayerThisLunge = false;
+    this._setState(AI.IDLE);
   }
 
   _dist() {
@@ -31,15 +34,20 @@ export class RuinHusk extends EnemyBase {
 
   _setState(state) {
     const cfg = RUIN_HUSK_AI;
+    const phaseCfg = cfg.phaseModifiers[this.worldPhase] ?? cfg.phaseModifiers.light;
     this.aiState = state;
-    if (state === AI.IDLE)    { this.stateTimer = cfg.idleMs; this.sprite.body.setVelocityX(0); }
-    if (state === AI.PATROL)  { this.stateTimer = cfg.patrolDurationMs; }
-    if (state === AI.RECOVER) { this.stateTimer = cfg.recoverMs; this.sprite.body.setVelocityX(0); }
+    this.clearAlert();
+    if (state === AI.IDLE)    { this.stateTimer = cfg.idleMs; this.sprite.body.setVelocityX(0); this.sprite.setTint(cfg.stateTints.idle); }
+    if (state === AI.PATROL)  { this.stateTimer = cfg.patrolDurationMs; this.sprite.setTint(cfg.stateTints.patrol); }
+    if (state === AI.CHASE)   { this.sprite.setTint(cfg.stateTints.chase); }
+    if (state === AI.RECOVER) { this.stateTimer = cfg.recoverMs; this.sprite.body.setVelocityX(0); this.sprite.setTint(cfg.stateTints.recover); }
     if (state === AI.ATTACK)  {
       this._attackPhase = "telegraph";
       this._attackTimer = cfg.attackTelegraphMs;
       this._hitPlayerThisLunge = false;
       this.sprite.body.setVelocityX(0);
+      this.sprite.setTint(cfg.stateTints.attackTelegraph ^ (this.worldPhase === SHADOW_SWAP_PHASES.SHADOW ? 0x221144 : 0x000000));
+      this.setAlert("!", this.worldPhase === SHADOW_SWAP_PHASES.SHADOW ? "#d6b8ff" : "#ffd58a");
     }
   }
 
@@ -50,11 +58,15 @@ export class RuinHusk extends EnemyBase {
     }
 
     const cfg = RUIN_HUSK_AI;
+    const phaseCfg = cfg.phaseModifiers[this.worldPhase] ?? cfg.phaseModifiers.light;
+    const detectionRange = cfg.detectionRange * phaseCfg.detectionRangeMultiplier;
+    const loseRange = cfg.loseRange * phaseCfg.detectionRangeMultiplier;
+    const attackRange = cfg.attackRange * phaseCfg.attackRangeMultiplier;
 
     switch (this.aiState) {
       case AI.IDLE: {
         this.stateTimer -= delta;
-        if (this._inRange(cfg.detectionRange)) { this._setState(AI.CHASE); break; }
+        if (this._inRange(detectionRange)) { this._setState(AI.CHASE); break; }
         if (this.stateTimer <= 0) { this._setState(AI.PATROL); }
         break;
       }
@@ -65,28 +77,29 @@ export class RuinHusk extends EnemyBase {
         if (offset > cfg.patrolRadius || this.sprite.body.blocked.right) this.patrolDir = -1;
         if (offset < -cfg.patrolRadius || this.sprite.body.blocked.left)  this.patrolDir = 1;
         this.setFacing(this.patrolDir);
-        this.sprite.body.setVelocityX(this.patrolDir * cfg.patrolSpeed);
-        if (this._inRange(cfg.detectionRange)) { this._setState(AI.CHASE); break; }
+        this.sprite.body.setVelocityX(this.patrolDir * cfg.patrolSpeed * phaseCfg.patrolSpeedMultiplier);
+        if (this._inRange(detectionRange)) { this._setState(AI.CHASE); break; }
         if (this.stateTimer <= 0) { this._setState(AI.IDLE); }
         break;
       }
 
       case AI.CHASE: {
-        if (!this._inRange(cfg.loseRange)) { this._setState(AI.PATROL); break; }
-        if (this._inRange(cfg.attackRange)) { this._facePlayer(); this._setState(AI.ATTACK); break; }
+        if (!this._inRange(loseRange)) { this._setState(AI.PATROL); break; }
+        if (this._inRange(attackRange)) { this._facePlayer(); this._setState(AI.ATTACK); break; }
         this._facePlayer();
-        this.sprite.body.setVelocityX(this.facing * cfg.chaseSpeed);
+        this.sprite.body.setVelocityX(this.facing * cfg.chaseSpeed * phaseCfg.chaseSpeedMultiplier);
         break;
       }
 
       case AI.ATTACK: {
         this._attackTimer -= delta;
         if (this._attackPhase === "telegraph") {
-          this.sprite.setTint(0xff5530);
           if (this._attackTimer <= 0) {
             this._attackPhase = "lunge";
             this._attackTimer = cfg.attackLungeMs;
-            this.sprite.body.setVelocityX(this.facing * cfg.attackLungeSpeed);
+            this.sprite.body.setVelocityX(this.facing * cfg.attackLungeSpeed * phaseCfg.attackLungeSpeedMultiplier);
+            this.sprite.setTint(cfg.stateTints.attackLunge);
+            this.setAlert("!!", this.worldPhase === SHADOW_SWAP_PHASES.SHADOW ? "#ff9ef6" : "#ffb36b");
           }
         } else {
           // Check overlap with player during lunge (once per lunge)
@@ -100,7 +113,7 @@ export class RuinHusk extends EnemyBase {
             const pb = this.player.sprite.body;
             const playerBox = { x: pb.x, y: pb.y, w: pb.width, h: pb.height };
             if (boxesOverlap(atkBox, playerBox) && !this.player.isInvulnerable()) {
-              this.player.applyDamage({ damage: cfg.attackDamage, sourceX: this.sprite.x });
+              this.player.applyDamage({ damage: cfg.attackDamage + phaseCfg.attackDamageBonus, sourceX: this.sprite.x });
               this._hitPlayerThisLunge = true;
             }
           }
@@ -115,7 +128,7 @@ export class RuinHusk extends EnemyBase {
       case AI.RECOVER: {
         this.stateTimer -= delta;
         if (this.stateTimer <= 0) {
-          this._setState(this._inRange(cfg.loseRange) ? AI.CHASE : AI.PATROL);
+          this._setState(this._inRange(loseRange) ? AI.CHASE : AI.PATROL);
         }
         break;
       }
@@ -125,8 +138,9 @@ export class RuinHusk extends EnemyBase {
   }
 
   getDisplayName() {
+    const phaseCfg = RUIN_HUSK_AI.phaseModifiers[this.worldPhase] ?? RUIN_HUSK_AI.phaseModifiers.light;
     return this.isAlive()
-      ? `${this.label} ${this.hp}/${this.maxHp} [${this.aiState}]`
+      ? `${this.label}${phaseCfg.nameSuffix} ${this.hp}/${this.maxHp} [${this.aiState}]`
       : `${this.label} defeated`;
   }
 
@@ -138,5 +152,19 @@ export class RuinHusk extends EnemyBase {
 
   onDefeat(_hit) {
     this.sprite.body.setVelocityX(0);
+  }
+
+  onRevive() {
+    this.patrolDir = 1;
+    this._setState(AI.IDLE);
+  }
+
+  onWorldPhaseChanged(phase) {
+    this.worldPhase = phase;
+    const tint = RUIN_HUSK_AI.phaseTints[phase] ?? 0xffffff;
+    this.nameText.setTint(tint);
+    if (this.isAlive()) {
+      this._setState(this.aiState);
+    }
   }
 }

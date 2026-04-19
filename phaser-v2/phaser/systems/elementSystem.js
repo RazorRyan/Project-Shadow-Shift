@@ -1,23 +1,46 @@
-import { ELEMENT_ORDER, ELEMENTS } from "../data/elementData.js";
+import { DEFAULT_ELEMENT, ELEMENT_ORDER, ELEMENT_REGISTRY, normalizeElement } from "../data/elementData.js";
 
-export function createElementSystem(initialElement = ELEMENTS.NONE) {
-  let current = initialElement;
+export function createElementSystem(initialElement = DEFAULT_ELEMENT) {
+  let current = normalizeElement(initialElement);
   const listeners = [];
+
+  function notify() {
+    listeners.forEach((cb) => cb(current));
+  }
 
   return {
     getElement() { return current; },
 
+    getData() {
+      return ELEMENT_REGISTRY[current];
+    },
+
+    is(element) {
+      return current === normalizeElement(element);
+    },
+
     cycleNext() {
       const idx = ELEMENT_ORDER.indexOf(current);
       current = ELEMENT_ORDER[(idx + 1) % ELEMENT_ORDER.length];
-      listeners.forEach(cb => cb(current));
+      notify();
+      return current;
     },
 
     setElement(el) {
-      current = el;
-      listeners.forEach(cb => cb(current));
+      const next = normalizeElement(el);
+      if (next === current) {
+        return current;
+      }
+      current = next;
+      notify();
+      return current;
     },
 
-    onChange(cb) { listeners.push(cb); },
+    onChange(cb, { immediate = false } = {}) {
+      listeners.push(cb);
+      if (immediate) {
+        cb(current);
+      }
+    },
   };
 }

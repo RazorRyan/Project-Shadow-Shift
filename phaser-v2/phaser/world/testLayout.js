@@ -3,7 +3,7 @@ import { validateRoomContent } from "../helpers/contentLoader.js";
 
 const ROOM_LAYOUTS = {
   presentation: {
-    label: "Ruin Hall",
+    label: "Outer Rampart",
     spawn: { x: 120, y: 540 },
     dummySpawns: [
       { x: 920, y: 534, label: "Ruin Husk" },
@@ -47,6 +47,8 @@ const ROOM_LAYOUTS = {
   test: {
     label: "Test Room",
     spawn: { x: 120, y: 540 },
+    worldWidth: 1280,
+    worldHeight: 720,
     dummySpawns: [
       { x: 870, y: 534, label: "Ruin Husk" },
       { x: 980, y: 534, label: "Guard Shell" }
@@ -79,7 +81,7 @@ export function getRoomLayout(mode = "presentation") {
 export function spawnRoomLayout(scene, solids, mode = "presentation") {
   // Phase 10: "presentation" uses the tilemap pipeline
   if (mode === "presentation") {
-    return loadRoom(scene, solids, "ruin-hall");
+    return loadRoom(scene, solids, "outer-rampart");
   }
 
   const layout = getRoomLayout(mode);

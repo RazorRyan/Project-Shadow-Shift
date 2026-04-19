@@ -12,15 +12,25 @@
     <aside class="hud-panel">
       <p class="eyebrow">Project Shadow Shift</p>
       <h1>Shadow Shift</h1>
-      <p class="subtitle">Phases 1 through 8 completed in this Phaser V2 branch.</p>
+      <p class="subtitle">Phases 1 through 27 completed in this Phaser V2 branch.</p>
 
       <section class="status-card">
-        <div><span>Room</span><strong id="roomValue">Ruin Hall</strong></div>
-        <div><span>World</span><strong id="worldValue">Light</strong></div>
-        <div><span>HP</span><strong id="hpValue">5 / 5</strong></div>
-        <div><span>Element</span><strong id="elementValue">None</strong></div>
-        <div><span>Weapon</span><strong id="weaponValue">Shard Blade I</strong></div>
-        <div><span>Objective</span><strong id="objectiveValue">Press Enter or click Enter the Ruin</strong></div>
+        <div><span>Room</span><strong id="roomValue">Outer Rampart</strong></div>
+        <div><span>World</span><strong id="worldValue" class="status-pill" data-phase="light">Light</strong></div>
+        <div class="hp-row">
+          <span>HP</span>
+          <div class="hp-readout">
+            <strong id="hpValue">5 / 5</strong>
+            <div class="meter-shell" aria-hidden="true">
+              <div id="hpMeterFill" class="meter-fill"></div>
+            </div>
+          </div>
+        </div>
+        <div><span>Element</span><strong id="elementValue" class="status-pill" data-element="None">None</strong></div>
+        <div><span>Weapon</span><strong id="weaponValue" class="status-pill" data-weapon-tier="1">Shard Blade I</strong></div>
+        <div><span>Map</span><strong id="mapValue">1 room charted</strong></div>
+        <div><span>Rest Point</span><strong id="checkpointValue">Unbound</strong></div>
+        <div><span>Objective</span><strong id="objectiveValue">Reach the Dash Core</strong></div>
       </section>
 
       <section class="controls-card">
@@ -50,9 +60,9 @@
 
       <div id="startOverlay" class="screen-overlay">
         <div class="screen-panel">
-          <p class="panel-kicker">Phases 1 through 8 completed</p>
+          <p class="panel-kicker">Phases 1 through 27 completed</p>
           <h2>Shadow Shift</h2>
-          <p>The ruins are restless. A vessel between worlds must move, fight, and endure.</p>
+          <p>Slip through Eclipse Keep, claim the Dash Core, and break into Ash Gate before the cinders swallow the path.</p>
           <button id="startButton" type="button">Enter the Ruin</button>
         </div>
       </div>

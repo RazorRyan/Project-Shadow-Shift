@@ -43,7 +43,7 @@ export function getAttackProfile(player, mode = "auto") {
   if (downslashRequested) {
     const attackWidth = getAttackWidth();
     const width = Math.max(42, attackWidth - 18);
-    return {
+    const profile = {
       id: "downslash",
       type: "downslash",
       damageBonus: 0,
@@ -61,10 +61,12 @@ export function getAttackProfile(player, mode = "auto") {
       bounceStrength: 520,
       hitTag: "pogo"
     };
+    return player.weaponSystem?.resolveAttackProfile(profile) ?? profile;
   }
 
   const comboIndex = getNextComboIndex(player);
-  return buildComboAttackProfile(player, COMBO_ATTACK_DEFINITIONS[comboIndex], comboIndex);
+  const profile = buildComboAttackProfile(player, COMBO_ATTACK_DEFINITIONS[comboIndex], comboIndex);
+  return player.weaponSystem?.resolveAttackProfile(profile) ?? profile;
 }
 
 export function getCurrentAttackBox(player, profile, rangeBonus = 0) {

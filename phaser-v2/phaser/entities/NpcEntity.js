@@ -13,20 +13,22 @@ export class NpcEntity {
    */
   constructor(scene, config) {
     this.scene      = scene;
-    this.dialogueId = config.dialogueId ?? "gate_keeper";
+    this.dialogueId = config.dialogueId ?? "ashen_warden";
+    this.label      = config.label ?? "NPC";
+    this.promptText = config.promptText ?? "[Z] Talk";
 
     // Visual representation
     this.sprite = scene.add.rectangle(config.x, config.y, 28, 48, 0x4a9eff).setDepth(3);
 
     // Label
-    this.nameTag = scene.add.text(config.x, config.y - 36, config.label ?? "NPC", {
+    this.nameTag = scene.add.text(config.x, config.y - 36, this.label, {
       fontSize: "9px",
       fontFamily: "monospace",
       color: "#a0c4ff",
     }).setOrigin(0.5, 1).setDepth(4);
 
     // Interact prompt (hidden until in range)
-    this.prompt = scene.add.text(config.x, config.y - 54, "[Z] Talk", {
+    this.prompt = scene.add.text(config.x, config.y - 54, this.promptText, {
       fontSize: "9px",
       fontFamily: "monospace",
       color: "#ffe060",
@@ -44,7 +46,10 @@ export class NpcEntity {
     this.prompt.setVisible(inRange);
 
     if (inRange && interactJustPressed) {
-      return this.dialogueId;
+      return {
+        dialogueId: this.dialogueId,
+        label: this.label,
+      };
     }
     return null;
   }
