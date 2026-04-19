@@ -1,22 +1,10 @@
-import { createDomUiBridge } from "../adapters/domUiBridge.js";
+import { createSandboxTextures } from "../fx/createSandboxTextures.js";
 import { getCurrentAttackBox, getAttackDamage, getSlashColor } from "../combat/playerAttackProfiles.js";
 import { PlayerController } from "../entities/PlayerController.js";
 import { TrainingDummy } from "../entities/TrainingDummy.js";
 import { createInputMap } from "../input/createInputMap.js";
-
-const TEST_LAYOUT = {
-  platforms: [
-    { x: 0, y: 620, w: 420, h: 100 },
-    { x: 520, y: 620, w: 260, h: 100 },
-    { x: 920, y: 620, w: 220, h: 100 },
-    { x: 240, y: 530, w: 120, h: 16 },
-    { x: 670, y: 470, w: 96, h: 16 }
-  ],
-  walls: [
-    { x: 760, y: 320, w: 28, h: 300 },
-    { x: 1120, y: 430, w: 30, h: 190 }
-  ]
-};
+import { createDomUiBridge } from "../ui/domUiBridge.js";
+import { spawnTestLayout } from "../world/testLayout.js";
 
 export class GameScene extends Phaser.Scene {
   constructor() {
@@ -27,7 +15,7 @@ export class GameScene extends Phaser.Scene {
   preload() {}
 
   create() {
-    this.createTextures();
+    createSandboxTextures(this);
     this.createBackdrop();
 
     this.ui = createDomUiBridge(this);
@@ -37,7 +25,7 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.setBounds(0, 0, 1280, 720);
 
     this.solids = this.physics.add.staticGroup();
-    this.spawnTestLayout();
+    spawnTestLayout(this, this.solids);
 
     this.player = new PlayerController(this, 120, 540, this.inputMap);
     this.physics.add.collider(this.player.sprite, this.solids);
@@ -69,62 +57,10 @@ export class GameScene extends Phaser.Scene {
     }).setScrollFactor(0);
   }
 
-  createTextures() {
-    if (!this.textures.exists("player-block")) {
-      const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-      graphics.fillStyle(0xf4efe1, 1);
-      graphics.fillRoundedRect(0, 0, 42, 64, 10);
-      graphics.lineStyle(2, 0x191826, 1);
-      graphics.strokeRoundedRect(1, 1, 40, 62, 10);
-      graphics.generateTexture("player-block", 42, 64);
-      graphics.destroy();
-    }
-
-    if (!this.textures.exists("solid-block")) {
-      const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-      graphics.fillStyle(0x2a3146, 1);
-      graphics.fillRect(0, 0, 64, 64);
-      graphics.lineStyle(2, 0x404b6c, 1);
-      graphics.strokeRect(1, 1, 62, 62);
-      graphics.generateTexture("solid-block", 64, 64);
-      graphics.destroy();
-    }
-
-    if (!this.textures.exists("training-dummy")) {
-      const graphics = this.make.graphics({ x: 0, y: 0, add: false });
-      graphics.fillStyle(0x6d7ea6, 1);
-      graphics.fillRoundedRect(0, 0, 56, 86, 8);
-      graphics.fillStyle(0x222736, 1);
-      graphics.fillCircle(28, 24, 12);
-      graphics.lineStyle(3, 0xe7ebf7, 0.9);
-      graphics.strokeRoundedRect(1, 1, 54, 84, 8);
-      graphics.generateTexture("training-dummy", 56, 86);
-      graphics.destroy();
-    }
-  }
-
   createBackdrop() {
     this.add.rectangle(640, 360, 1280, 720, 0x0b1020);
     this.add.circle(960, 140, 140, 0x6677d6, 0.12);
     this.add.circle(220, 120, 110, 0xeadfa0, 0.08);
-  }
-
-  spawnTestLayout() {
-    for (const platform of TEST_LAYOUT.platforms) {
-      this.createStaticBlock(platform, 0x33405a);
-    }
-
-    for (const wall of TEST_LAYOUT.walls) {
-      this.createStaticBlock(wall, 0x2b3650);
-    }
-  }
-
-  createStaticBlock(rect, tint) {
-    const block = this.solids.create(rect.x + rect.w / 2, rect.y + rect.h / 2, "solid-block");
-    block.setDisplaySize(rect.w, rect.h);
-    block.setTint(tint);
-    block.refreshBody();
-    return block;
   }
 
   startRun() {

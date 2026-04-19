@@ -1,6 +1,7 @@
 import { PLAYER_MOVEMENT_CONFIG } from "../config/playerMovementConfig.js";
 import { PLAYER_COMBAT_CONFIG } from "../config/playerCombatConfig.js";
 import { canQueueComboAttack, getAttackProfile } from "../combat/playerAttackProfiles.js";
+import { createPlayerPresentationDriver } from "../systems/playerPresentationDriver.js";
 
 function approachValue(current, target, delta) {
   if (current < target) {
@@ -26,7 +27,10 @@ function resolveHorizontalVelocity(player, moveAxis, deltaSeconds) {
   const baseRate = grounded
     ? (accelerating ? config.groundAcceleration : config.groundDeceleration)
     : (accelerating ? config.airAcceleration : config.airDeceleration);
-  const rate = reversing ? baseRate * config.turnAccelerationMultiplier : baseRate;
+  const landingBoost = grounded && player.landingRecoveryTimer > 0
+    ? config.landingTractionMultiplier
+    : 1;
+  const rate = (reversing ? baseRate * config.turnAccelerationMultiplier : baseRate) * landingBoost;
 
   return approachValue(currentVelocity, targetSpeed, rate * deltaSeconds);
 }
@@ -49,6 +53,9 @@ export class PlayerController {
     this.wallSliding = false;
     this.jumpReleased = false;
     this.jumpCutReady = false;
+    this.wasGrounded = false;
+    this.airborneFallSpeed = 0;
+    this.landingRecoveryTimer = 0;
     this.isDashing = false;
     this.attackBufferTimer = 0;
     this.attackTimer = 0;
@@ -70,6 +77,7 @@ export class PlayerController {
     this.sprite.body.setAllowGravity(true);
     this.sprite.body.setGravityY(this.config.gravity);
     this.sprite.body.setMaxVelocity(this.config.dashSpeed, this.config.terminalFallSpeed);
+    this.presentation = createPlayerPresentationDriver(this);
   }
 
   isGrounded() {
@@ -111,6 +119,9 @@ export class PlayerController {
     this.wallSliding = false;
     this.jumpReleased = false;
     this.jumpCutReady = false;
+    this.wasGrounded = false;
+    this.airborneFallSpeed = 0;
+    this.landingRecoveryTimer = 0;
     this.isDashing = false;
     this.attackBufferTimer = 0;
     this.attackTimer = 0;
@@ -123,6 +134,7 @@ export class PlayerController {
     this.queuedAttack = false;
     this.activeAttackProfile = null;
     this.attackTargetIds.clear();
+    this.presentation.update(0);
   }
 
   getVerticalAim() {
@@ -192,6 +204,9 @@ export class PlayerController {
     this.wallJumpLock = Math.max(0, this.wallJumpLock - delta);
     this.wallJumpGraceTimer = Math.max(0, this.wallJumpGraceTimer - delta);
     this.comboChainTimer = Math.max(0, this.comboChainTimer - delta);
+    this.landingRecoveryTimer = Math.max(0, this.landingRecoveryTimer - delta);
+
+    const startedGrounded = this.isGrounded();
 
     const moveAxis = (this.input.right.isDown || this.input.rightAlt.isDown ? 1 : 0)
       - (this.input.left.isDown || this.input.leftAlt.isDown ? 1 : 0);
@@ -213,10 +228,13 @@ export class PlayerController {
       this.attackBufferTimer = PLAYER_COMBAT_CONFIG.attackKeyBufferMs;
     }
 
-    if (this.isGrounded()) {
+    if (startedGrounded) {
       this.coyoteTimer = this.config.coyoteTimeMs;
       this.wallSliding = false;
       this.jumpCutReady = false;
+      this.airborneFallSpeed = 0;
+    } else {
+      this.airborneFallSpeed = Math.max(this.airborneFallSpeed, body.velocity.y);
     }
 
     if (this.isOnWall()) {
@@ -288,6 +306,14 @@ export class PlayerController {
       this.comboStep = -1;
     }
 
+    const endedGrounded = this.isGrounded();
+    if (endedGrounded && !this.wasGrounded && this.airborneFallSpeed >= this.config.landingRecoveryFallThreshold) {
+      this.landingRecoveryTimer = this.config.landingRecoveryMs;
+      this.airborneFallSpeed = 0;
+    }
+
+    this.presentation.update(delta);
+    this.wasGrounded = endedGrounded;
     this.jumpReleased = false;
   }
 
