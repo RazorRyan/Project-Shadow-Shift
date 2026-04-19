@@ -26,8 +26,7 @@ export class RuinHusk extends EnemyBase {
   }
 
   _facePlayer() {
-    this.facing = this.player.sprite.x >= this.sprite.x ? 1 : -1;
-    this.sprite.setFlipX(this.facing < 0);
+    this.setFacing(this.player.sprite.x >= this.sprite.x ? 1 : -1);
   }
 
   _setState(state) {
@@ -65,8 +64,7 @@ export class RuinHusk extends EnemyBase {
         const offset = this.sprite.x - this.spawnX;
         if (offset > cfg.patrolRadius || this.sprite.body.blocked.right) this.patrolDir = -1;
         if (offset < -cfg.patrolRadius || this.sprite.body.blocked.left)  this.patrolDir = 1;
-        this.facing = this.patrolDir;
-        this.sprite.setFlipX(this.facing < 0);
+        this.setFacing(this.patrolDir);
         this.sprite.body.setVelocityX(this.patrolDir * cfg.patrolSpeed);
         if (this._inRange(cfg.detectionRange)) { this._setState(AI.CHASE); break; }
         if (this.stateTimer <= 0) { this._setState(AI.IDLE); }
@@ -124,9 +122,12 @@ export class RuinHusk extends EnemyBase {
     }
 
     // Debug: show AI state in name label
-    if (this.isAlive()) {
-      this.nameText.setText(`${this.label} ${this.hp}/${this.maxHp} [${this.aiState}]`);
-    }
+  }
+
+  getDisplayName() {
+    return this.isAlive()
+      ? `${this.label} ${this.hp}/${this.maxHp} [${this.aiState}]`
+      : `${this.label} defeated`;
   }
 
   onHurt(_hit) {

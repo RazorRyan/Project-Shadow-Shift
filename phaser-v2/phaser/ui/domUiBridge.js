@@ -1,4 +1,4 @@
-export function createDomUiBridge(scene) {
+export function createDomUiBridge(scene, debug = false) {
   /** Hex CSS colors for each element */
   const ELEMENT_CSS = {
     None: "#c8d0e8",
@@ -16,8 +16,13 @@ export function createDomUiBridge(scene) {
     startOverlay: document.getElementById("startOverlay"),
     startButton: document.getElementById("startButton"),
     roomToggleButton: document.getElementById("roomToggleButton"),
+    debugTools: document.getElementById("debugTools"),
     touchHud: document.getElementById("touchHud")
   };
+
+  if (debug && hud.debugTools) {
+    hud.debugTools.style.display = "";
+  }
 
   hud.world.textContent = "Light";
   hud.element.textContent = "None";

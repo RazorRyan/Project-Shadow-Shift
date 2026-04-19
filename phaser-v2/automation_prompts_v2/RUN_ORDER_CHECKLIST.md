@@ -6,8 +6,8 @@
 - [x] 04 phase camera fx and impact
 - [x] 05 phase input system
 - [x] 06 phase player state
-- [ ] 07 phase combat framework
-- [ ] 08 phase enemy base
+- [x] 07 phase combat framework
+- [x] 08 phase enemy base
 - [ ] 09 phase enemy ai
 - [ ] 10 phase tilemap world
 - [ ] 11 phase room transitions

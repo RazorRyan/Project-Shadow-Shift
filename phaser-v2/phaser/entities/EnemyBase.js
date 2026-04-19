@@ -24,6 +24,8 @@ export class EnemyBase {
     this.scene = scene;
     this.stats = ENEMY_STATS[statKey];
     this.label = this.stats.label;
+    this.spawnX = x;
+    this.spawnY = y;
     this.maxHp = this.stats.maxHp;
     this.hp = this.maxHp;
     this.facing = 1;
@@ -49,6 +51,27 @@ export class EnemyBase {
 
   canBeHit() {
     return this.isAlive() && this.invulnTimer <= 0;
+  }
+
+  setFacing(direction) {
+    this.facing = direction >= 0 ? 1 : -1;
+    this.sprite.setFlipX(this.facing < 0);
+  }
+
+  resetCombatState() {
+    this.hp = this.maxHp;
+    this.invulnTimer = 0;
+    this.hurtFlashTimer = 0;
+    this.defeated = false;
+    this.sprite.setAlpha(1);
+    this.sprite.setTint(this.stats.tint);
+    this.sprite.setPosition(this.spawnX, this.spawnY);
+    this.sprite.body.setVelocity(0, 0);
+  }
+
+  revive() {
+    this.resetCombatState();
+    this.onRevive();
   }
 
   getHurtbox() {
@@ -98,11 +121,7 @@ export class EnemyBase {
       this.sprite.x,
       this.sprite.y - this.stats.height * 0.5 - 4
     );
-    this.nameText.setText(
-      this.isAlive()
-        ? `${this.label} ${this.hp}/${this.maxHp}`
-        : `${this.label} defeated`
-    );
+    this.nameText.setText(this.getDisplayName());
 
     // Phase 26: skip AI logic when culled (out of range)
     if (!culled) {
@@ -116,10 +135,17 @@ export class EnemyBase {
   }
 
   // --- overridable hooks ---
+  getDisplayName() {
+    return this.isAlive()
+      ? `${this.label} ${this.hp}/${this.maxHp}`
+      : `${this.label} defeated`;
+  }
+
   // eslint-disable-next-line no-unused-vars
   onHurt(_hit) {}
   // eslint-disable-next-line no-unused-vars
   onDefeat(_hit) {}
+  onRevive() {}
   // eslint-disable-next-line no-unused-vars
   onUpdate(_delta) {}
 }

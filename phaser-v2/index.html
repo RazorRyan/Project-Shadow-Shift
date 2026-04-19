@@ -11,8 +11,8 @@
   <main class="app-shell">
     <aside class="hud-panel">
       <p class="eyebrow">Project Shadow Shift</p>
-      <h1>Phaser V2 Sandbox</h1>
-      <p class="subtitle">Phases 1 through 27 completed in this Phaser V2 migration branch, parked outside the active `webjs` build.</p>
+      <h1>Shadow Shift</h1>
+      <p class="subtitle">Phases 1 through 8 completed in this Phaser V2 branch.</p>
 
       <section class="status-card">
         <div><span>Room</span><strong id="roomValue">Ruin Hall</strong></div>
@@ -25,7 +25,6 @@
 
       <section class="controls-card">
         <h2>Controls</h2>
-        <button id="roomToggleButton" type="button">Switch To Test Room</button>
         <p><kbd>A</kbd><kbd>D</kbd> or arrows: Move</p>
         <p><kbd>S</kbd> or <kbd>Down</kbd>: Down aim</p>
         <p><kbd>Space</kbd>: Jump</p>
@@ -33,12 +32,15 @@
         <p><kbd>F</kbd>: Attack</p>
         <p><kbd>Q</kbd>: Shadow Swap</p>
         <p><kbd>E</kbd>: Cycle Element</p>
-        <p><kbd>T</kbd>: Weapon Upgrade</p>
-        <p><kbd>Z</kbd>: Interact / Checkpoint</p>
+        <p><kbd>Z</kbd>: Interact</p>
         <p><kbd>P</kbd>: Save</p>
         <p><kbd>O</kbd>: Load Save</p>
-        <p><kbd>H</kbd>: Debug damage</p>
         <p><kbd>Enter</kbd>: Start</p>
+        <div id="debugTools" style="display:none">
+          <p><kbd>T</kbd>: Weapon Upgrade</p>
+          <p><kbd>H</kbd>: Debug damage</p>
+          <button id="roomToggleButton" type="button">Switch To Test Room</button>
+        </div>
       </section>
     </aside>
 
@@ -48,9 +50,9 @@
 
       <div id="startOverlay" class="screen-overlay">
         <div class="screen-panel">
-          <p class="panel-kicker">Phases 1 through 27 completed</p>
-          <h2>Shadow Shift Phaser V2</h2>
-          <p>Foundation, input, player, combat, enemies, AI, tilemap world, room transitions, save, abilities, Shadow Swap, elements, weapon evolution, HUD, checkpoints, NPC dialogue, boss framework, audio, content pipeline, performance, and polish are now running in Phaser 3.</p>
+          <p class="panel-kicker">Phases 1 through 8 completed</p>
+          <h2>Shadow Shift</h2>
+          <p>The ruins are restless. A vessel between worlds must move, fight, and endure.</p>
           <button id="startButton" type="button">Enter the Ruin</button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { createSandboxTextures } from "../fx/createSandboxTextures.js";
 import { getCurrentAttackBox, getAttackDamage, getSlashColor } from "../combat/playerAttackProfiles.js";
-import { resolveAttack, buildHitEvent } from "../combat/combatResolver.js";
+import { buildHitEvent, resolveAppliedAttack } from "../combat/combatResolver.js";
 import { PlayerController } from "../entities/PlayerController.js";
 import { TrainingDummy } from "../entities/TrainingDummy.js";
 import { EnemyBase } from "../entities/EnemyBase.js";
@@ -23,6 +23,10 @@ import { createCheckpointSystem } from "../world/checkpointSystem.js";
 import { NpcEntity } from "../entities/NpcEntity.js";
 import { createDialogueRenderer } from "../ui/dialogueRenderer.js";
 import { DIALOGUE } from "../data/dialogueData.js";
+
+/** Set to true to show hitboxes, HP overlay, and status log. */
+const DEBUG = false;
+
 const ROOM_MODE_STORAGE_KEY = "shadow-shift-phaser-room-mode";
 
 export class GameScene extends Phaser.Scene {
@@ -39,7 +43,7 @@ export class GameScene extends Phaser.Scene {
   init(data) {
     this.roomId   = data?.roomId   ?? null;
     this.spawnId  = data?.spawnId  ?? "default";
-    this.roomMode = data?.roomMode ?? window.localStorage.getItem(ROOM_MODE_STORAGE_KEY) ?? "presentation";
+    this.roomMode = data?.roomMode ?? (DEBUG ? window.localStorage.getItem(ROOM_MODE_STORAGE_KEY) : null) ?? "presentation";
     this.autoStart    = Boolean(data?.autoStart);
     this.transitioning = false;
   }
@@ -50,16 +54,13 @@ export class GameScene extends Phaser.Scene {
     createSandboxTextures(this);
     this.createBackdrop();
 
-    this.ui = createDomUiBridge(this);
+    this.ui = createDomUiBridge(this, DEBUG);
     this.inputMap = createInputMap(this);
     this.impactFeedback = createImpactFeedbackSystem(this);
 
     // Phase 13: ability system — init before save load
     const savedData = saveManager.load();
     this.abilities = createAbilitySystem(savedData?.unlockedAbilities ?? []);
-    if (!this.abilities.has("double_jump")) {
-      this.abilities.unlock("double_jump"); // sandbox default
-    }
 
     this.physics.world.setBounds(0, 0, 1280, 720);
     this.cameras.main.setBounds(0, 0, 1280, 720);
@@ -140,28 +141,16 @@ export class GameScene extends Phaser.Scene {
     this.upgradeKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T);
 
     this.attackGraphics = this.add.graphics().setDepth(6);
-    this.statusText = this.add.text(24, 76, "Attack sandbox offline", {
+    this.statusText = this.add.text(24, 76, "", {
       fontFamily: "monospace",
       fontSize: "12px",
       color: "#b7bfd6"
-    }).setScrollFactor(0);
-    this.playerStateText = this.add.text(24, 94, "Vessel HP 5/5", {
+    }).setScrollFactor(0).setVisible(DEBUG);
+    this.playerStateText = this.add.text(24, 94, "", {
       fontFamily: "monospace",
       fontSize: "12px",
       color: "#b7bfd6"
-    }).setScrollFactor(0);
-
-    this.add.text(24, 24, "Shadow Shift V2 Phaser", {
-      fontFamily: "monospace",
-      fontSize: "22px",
-      color: "#f4efe1"
-    }).setScrollFactor(0);
-
-    this.add.text(24, 52, "Phases 1 through 27 completed in this branch", {
-      fontFamily: "monospace",
-      fontSize: "12px",
-      color: "#b7bfd6"
-    }).setScrollFactor(0);
+    }).setScrollFactor(0).setVisible(DEBUG);
 
     this.ui.setRoomLabel(this.roomLayout.label);
     this.ui.setRoomModeButtonLabel(
@@ -240,7 +229,9 @@ export class GameScene extends Phaser.Scene {
         checkpointId: this.checkpointSystem.getActive()?.id ?? null,
       });
       this.audio.onSave();
-      this.statusText.setText("Progress saved (P) | Load: O");
+      this.statusText.setText("Saved");
+      this.ui.setObjective("Game saved.");
+      this._objectiveOverride = 2000;
     }
     if (Phaser.Input.Keyboard.JustDown(this.loadKey)) {
       const saved = saveManager.load();
@@ -251,6 +242,8 @@ export class GameScene extends Phaser.Scene {
         while (this.weaponSystem.getStageIndex() < wi) this.weaponSystem.upgradeToNext();
         this.ui.setWeapon(this.weaponSystem.getStage().label);
         this.statusText.setText(`Loaded | Weapon: ${this.weaponSystem.getStage().label}`);
+        this.ui.setObjective("Save loaded.");
+        this._objectiveOverride = 2000;
       } else {
         this.statusText.setText("No save found");
       }
@@ -278,7 +271,7 @@ export class GameScene extends Phaser.Scene {
     this.player.update(delta);
     this.impactFeedback.triggerLanding(this.player.consumeLandingImpact());
 
-    if (this.inputMap.wasPressed("debugDamage")) {
+    if (DEBUG && this.inputMap.wasPressed("debugDamage")) {
       const result = this.player.applyDamage({
         damage: 1,
         sourceX: this.player.sprite.x - this.player.facing * 32
@@ -296,7 +289,8 @@ export class GameScene extends Phaser.Scene {
 
     if (this.player.consumeRespawnRequest()) {
       this.player.resetTo(spawnPoint.x, spawnPoint.y);
-      this.ui.setObjective("Respawned at the movement start point");
+      this.ui.setObjective("Returned to last rest point.");
+      this._objectiveOverride = 2000;
       this.statusText.setText("Vessel restored at the gate");
     }
 
@@ -325,6 +319,8 @@ export class GameScene extends Phaser.Scene {
     if (cpHit) {
       this.audio.onCheckpoint();
       this.statusText.setText(`Checkpoint activated: ${cpHit.id}`);
+      this.ui.setObjective("Rest point activated.");
+      this._objectiveOverride = 2000;
     }
 
     for (const dummy of this.trainingDummies) {
@@ -335,7 +331,7 @@ export class GameScene extends Phaser.Scene {
       enemy.update(delta, Math.abs(enemy.sprite.x - this.player.sprite.x) > 600);
     }
     this.hud.update();
-    this.updateCombatSandbox(delta);
+    this.updateCombat(delta);
     this.playerStateText.setText(
       this.player.isDead()
         ? "Vessel HP 0/5 | rebuilding..."
@@ -344,7 +340,8 @@ export class GameScene extends Phaser.Scene {
 
     if (this.player.sprite.y > 900) {
       this.player.resetTo(spawnPoint.x, spawnPoint.y);
-      this.ui.setObjective("Respawned at the movement start point");
+      this.ui.setObjective("Returned to last rest point.");
+      this._objectiveOverride = 2000;
       return;
     }
 
@@ -360,13 +357,12 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.ui.setObjective(
-      this.player.wallSliding
-        ? "Wall slide active: jump away or dash"
-        : this.player.getActiveAttackProfile()
-          ? `${this.roomLayout.label}: chain attacks | Q: swap world`
-          : `${this.roomLayout.label}: run, jump, dash, attack | Q: swap | P: save`
-    );
+    if (!(this._objectiveOverride > 0)) {
+      this.ui.setObjective(
+        this.player.wallSliding ? "Wall slide" : this.roomLayout.label
+      );
+    }
+    this._objectiveOverride = Math.max(0, (this._objectiveOverride ?? 0) - delta);
   }
 
   // Phase 15/16: apply visual + physics changes on world swap
@@ -388,27 +384,32 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.flash(200, r, g, b, false);
   }
 
-  updateCombatSandbox(_delta) {
+  updateCombat(_delta) {
     this.attackGraphics.clear();
 
     const profile = this.player.getActiveAttackProfile();
-    if (!profile) {
-      this.statusText.setText("Attack sandbox ready: F to slash, hold S or Down in air for downslash");
-      return;
-    }
+    if (!profile) return;
 
     const attackBox = getCurrentAttackBox(this.player, profile, this.weaponSystem.getRangeBonus());
-    const slashColor = getSlashColor(profile);
-    this.attackGraphics.fillStyle(slashColor, 0.22);
-    this.attackGraphics.lineStyle(2, slashColor, 0.85);
-    this.attackGraphics.fillRect(attackBox.x, attackBox.y, attackBox.w, attackBox.h);
-    this.attackGraphics.strokeRect(attackBox.x, attackBox.y, attackBox.w, attackBox.h);
 
-    const eligible = this.trainingDummies.filter(d => !this.player.hasHitTarget(d.label));
-    for (const dummy of resolveAttack(attackBox, eligible)) {
-      this.player.registerAttackHit(dummy.label);
-      const hit = buildHitEvent(profile, this.player.facing, getAttackDamage(profile));
-      const result = dummy.applyHit(hit);
+    if (DEBUG) {
+      const slashColor = getSlashColor(profile);
+      this.attackGraphics.fillStyle(slashColor, 0.22);
+      this.attackGraphics.lineStyle(2, slashColor, 0.85);
+      this.attackGraphics.fillRect(attackBox.x, attackBox.y, attackBox.w, attackBox.h);
+      this.attackGraphics.strokeRect(attackBox.x, attackBox.y, attackBox.w, attackBox.h);
+    }
+
+    const dummyHits = resolveAppliedAttack({
+      attackBox,
+      targets: this.trainingDummies,
+      hasHitTarget: (targetId) => this.player.hasHitTarget(targetId),
+      registerHitTarget: (targetId) => this.player.registerAttackHit(targetId),
+      getTargetId: (target) => target.label,
+      createHit: () => buildHitEvent(profile, this.player.facing, getAttackDamage(profile))
+    });
+
+    for (const { target: dummy, hit, result } of dummyHits) {
       if (profile.type === "downslash") {
         this.player.sprite.body.setVelocityY(-profile.bounceStrength);
       }
@@ -421,25 +422,33 @@ export class GameScene extends Phaser.Scene {
       );
     }
 
-    const eligibleEnemies = this.enemies.filter(e => !this.player.hasHitTarget(e.label + e.sprite.x));
-    for (const enemy of resolveAttack(attackBox, eligibleEnemies)) {
-      this.player.registerAttackHit(enemy.label + enemy.sprite.x);
-      const elMult = getElementMultiplier(this.elementSystem.getElement(), enemy.stats?.weakness);
-      const rawDamage = this.weaponSystem.applyDamage(getAttackDamage(profile));
-      const finalDamage = elMult > 1 ? Math.ceil(rawDamage * elMult) : rawDamage;
-      const hit = buildHitEvent(profile, this.player.facing, finalDamage);
-      const result = enemy.applyHit(hit);
+    const enemyHits = resolveAppliedAttack({
+      attackBox,
+      targets: this.enemies,
+      hasHitTarget: (targetId) => this.player.hasHitTarget(targetId),
+      registerHitTarget: (targetId) => this.player.registerAttackHit(targetId),
+      getTargetId: (target) => `${target.label}:${target.sprite.x}:${target.sprite.y}`,
+      createHit: (enemy) => {
+        const elMult = getElementMultiplier(this.elementSystem.getElement(), enemy.stats?.weakness);
+        const rawDamage = this.weaponSystem.applyDamage(getAttackDamage(profile));
+        const finalDamage = elMult > 1 ? Math.ceil(rawDamage * elMult) : rawDamage;
+        return buildHitEvent(profile, this.player.facing, finalDamage);
+      }
+    });
+
+    for (const { target: enemy, hit, result } of enemyHits) {
       if (profile.type === "downslash") {
         this.player.sprite.body.setVelocityY(-profile.bounceStrength);
       }
 
       const shakeMs = profile.finisher ? 90 : profile.hitTag === "heavy" ? 70 : 50;
       this.cameras.main.shake(shakeMs, 0.003);
+      const elMult = getElementMultiplier(this.elementSystem.getElement(), enemy.stats?.weakness);
       const reactionLabel = elMult > 1 ? ` [WEAK x${elMult.toFixed(2)}]` : "";
       this.statusText.setText(
         result?.defeated
           ? `${enemy.label} defeated by ${profile.id}${reactionLabel}`
-          : `${profile.id} hit ${enemy.label} for ${finalDamage}${reactionLabel}`
+          : `${profile.id} hit ${enemy.label} for ${hit.damage}${reactionLabel}`
       );
     }
   }

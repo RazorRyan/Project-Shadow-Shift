@@ -44,10 +44,7 @@ export const ROOM_REGISTRY = {
       { id: "right", x: 1230, y: 448, w: 50, h: 128, targetRoom: "ruin-hall-2", spawnId: "left" },
     ],
     enemySpawns:  [{ x: 704, y: 544, statKey: "ruin_husk" }],
-    dummySpawns:  [
-      { x: 1056, y: 544, label: "Ruin Husk" },
-      { x: 1152, y: 544, label: "Guard Shell" },
-    ],
+    dummySpawns:  [],
     checkpoints: [
       { id: "cp-ruin-hall-1", x: 64, y: 552, w: 80, h: 72, spawnId: "left" },
     ],
@@ -86,7 +83,7 @@ export const ROOM_REGISTRY = {
       { x: 820, y: 544, statKey: "ruin_husk" },
       { x: 1000, y: 544, statKey: "ruin_husk" },
     ],
-    dummySpawns: [],
+    dummySpawns:  [],
     checkpoints: [],
   },
 };
