@@ -264,11 +264,16 @@ export class GameScene extends Phaser.Scene {
 
     this.drawRoomComposition(roomLayout);
 
-    if (isAsh) {
+    const theme = roomLayout.theme ?? "rampart";
+    if (theme === "ash") {
       this.drawAshGateSetPiece(roomLayout);
-      return;
+    } else if (theme === "galleries") {
+      this.drawGalleriesSetPiece(roomLayout);
+    } else if (theme === "boss") {
+      this.drawEclipseThroneSetPiece(roomLayout);
+    } else {
+      this.drawRampartSetPiece(roomLayout);
     }
-    this.drawRampartSetPiece(roomLayout);
   }
 
   drawRoomComposition(roomLayout) {
@@ -318,6 +323,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   drawRampartSetPiece(roomLayout = {}) {
+    // Room A: start shrine area (matches webjs drawRoomAStartShrine)
+    this.drawRootCluster(110, 615, 90, false);
+    this.drawLantern(310, 482, 0xf0d6a1, 0.16);
+    const pillar = this.add.graphics().setDepth(0);
+    pillar.fillStyle(0x181828, 0.62);
+    pillar.beginPath();
+    pillar.moveTo(74, 620);
+    pillar.lineTo(98, 520);
+    pillar.lineTo(142, 520);
+    pillar.lineTo(170, 620);
+    pillar.closePath();
+    pillar.fillPath();
+    pillar.fillStyle(0xe6eeff, 0.08);
+    pillar.fillRect(108, 542, 24, 34);
+
+    // Room B: Dash Core arch area (matches webjs drawRoomBDashGateSet)
     const arch = this.add.graphics().setDepth(0);
     arch.fillStyle(0x382c40, 0.64);
     arch.fillRect(820, 504, 190, 126);
@@ -331,11 +352,17 @@ export class GameScene extends Phaser.Scene {
     chain.moveTo(924, 304);
     chain.lineTo(924, 454);
     chain.strokePath();
-    for (let y = 320; y < 454; y += 16) {
-      this.add.ellipse(924, y, 8, 12, 0xb7a37d, 0.18).setDepth(1);
+    for (let cy = 320; cy < 454; cy += 16) {
+      this.add.ellipse(924, cy, 8, 12, 0xb7a37d, 0.18).setDepth(1);
     }
 
     this.drawLantern(924, 454, 0xefcf9c, 0.16);
+
+    // Eclipse brazier at x=680 (matches webjs drawEclipseBraziers)
+    this.drawEclipseBrazier(680, 586);
+
+    // Chain curtain cluster at x=560 (matches webjs drawChainCurtains)
+    this.drawChainCurtainCluster(560, 60, 120, false);
 
     if ((roomLayout.checkpoints ?? []).length === 0) {
       this.drawShrine(120, 540, false);
@@ -343,16 +370,150 @@ export class GameScene extends Phaser.Scene {
   }
 
   drawAshGateSetPiece(roomLayout = {}) {
-    const gateMouth = this.add.graphics().setDepth(0);
-    gateMouth.fillStyle(0x261513, 0.54);
-    gateMouth.fillRect(930, 402, 170, 218);
-    gateMouth.fillStyle(0x0f0908, 0.72);
-    gateMouth.fillRect(960, 428, 110, 192);
+    // Broken columns across the room (matches webjs drawRoomCEnemyHall, room-relative positions)
+    for (const cx of [220, 540, 860, 1180]) {
+      this.drawBrokenColumn(cx, 446, 30, 174);
+    }
 
-    this.add.ellipse(1002, 454, 132, 84, 0xffa062, 0.08).setDepth(0);
+    // Root cluster near the barrier approach (matches webjs drawRoomCEnemyHall)
+    this.drawRootCluster(860, 620, 320, true);
+
+    // Eclipse braziers (matches webjs drawEclipseBraziers, room-relative)
+    this.drawEclipseBrazier(40, 586);
+    this.drawEclipseBrazier(1080, 586);
+
+    // Chain curtain cluster (matches webjs drawChainCurtains, room-relative)
+    this.drawChainCurtainCluster(320, 40, 160, true);
 
     if (!roomLayout.barrierMarker && this.isBarrierActive()) {
       this.drawBarrierLandmark(1000, 520, 40, 100);
+    }
+  }
+
+  drawGalleriesSetPiece(roomLayout = {}) {
+    // Entry archway from ash-gate boundary (webjs drawRoomDExitSanctum)
+    // World 2480, room-local -80 — draw from x=-80, Phaser clips off-left naturally
+    this.drawArchway(-80, 364, 340, 256, 0x28223c, 0.80);
+
+    // Lantern on visible side of entry (webjs drawLantern(2760) → room-local 200)
+    this.drawLantern(200, 348, 0xefcf9c, 0.15);
+
+    // Root tendrils at room floor entry (webjs drawRoomDExitSanctum → room-local 80)
+    this.drawRootCluster(80, 620, 240, false);
+
+    // Faint horizontal ledge-detail line (webjs ctx.fillRect(2880,408,136,8) → room-local 320)
+    const detail = this.add.graphics().setDepth(1);
+    detail.fillStyle(0xffffff, 0.04);
+    detail.fillRect(320, 408, 136, 8);
+
+    // Chain curtains (webjs drawChainCurtains at world 2600 → room-local 40)
+    this.drawChainCurtainCluster(40, 50, 180, false);
+  }
+
+  drawEclipseThroneSetPiece(_roomLayout = {}) {
+    // Boss arena archway (webjs drawBossShrineArena: drawArchway(3440, 320, 440, 300) → room-local x=20)
+    this.drawArchway(20, 320, 440, 300, 0x1c1c34, 0.88);
+
+    // Flanking broken columns (webjs: 3480→60, 3770→350 room-local)
+    this.drawBrokenColumn(60, 392, 36, 228);
+    this.drawBrokenColumn(350, 386, 36, 234);
+
+    // Arena lanterns (webjs: 3570→150, 3720→300 room-local)
+    this.drawLantern(150, 350, 0xf0d6a1, 0.14);
+    this.drawLantern(300, 350, 0xf0d6a1, 0.14);
+
+    // Eclipse brazier (webjs: 3560→140 room-local; only one brazier in eclipse-throne range)
+    this.drawEclipseBrazier(140, 586);
+
+    // Chain curtains (webjs: world 3520 → room-local 100)
+    this.drawChainCurtainCluster(100, 40, 160, false);
+
+    // Boss arena semicircle floor markers (webjs drawBossShrineArena arc center 3640 → room-local 220)
+    const arenaG = this.add.graphics().setDepth(1);
+    arenaG.lineStyle(3, 0xf2d49d, 0.24);
+    arenaG.beginPath();
+    arenaG.arc(220, 604, 132, Math.PI, Math.PI * 2, false, 32);
+    arenaG.strokePath();
+    arenaG.beginPath();
+    arenaG.arc(220, 604, 62, Math.PI, Math.PI * 2, false, 32);
+    arenaG.strokePath();
+  }
+
+  drawArchway(x, y, w, h, colorHex, alpha) {
+    // Matches webjs drawArchway(x, y, w, h, color):
+    //   fillRect(x, y+34, w, h-34)  → rect body
+    //   arc(x+w/2, y+34, w/2, PI, 0) → semicircle cap
+    //   inner dark fillRect(x+34, y+56, w-68, h-56)
+    const g = this.add.graphics().setDepth(0);
+    g.fillStyle(colorHex, alpha);
+    g.fillRect(x, y + 34, w, h - 34);
+    g.fillCircle(x + w * 0.5, y + 34, w * 0.5);
+    g.fillStyle(0x0c0f18, 0.82);
+    g.fillRect(x + 34, y + 56, w - 68, h - 56);
+  }
+
+  drawRootCluster(x, y, width, isAsh) {
+    const color = isAsh ? 0x8472a4 : 0x7e6ca6;
+    const g = this.add.graphics().setDepth(0);
+    g.lineStyle(4, color, 0.24);
+    for (let i = 0; i < 6; i++) {
+      const sx = x + i * (width / 5);
+      const midX = sx - 10 + i * 2;
+      const midY = y - 28 - (i % 2) * 10;
+      const ex = sx + 10 - i * 2;
+      const ey = y - 54 - i * 6;
+      g.beginPath();
+      g.moveTo(sx, y);
+      g.lineTo(midX, midY);
+      g.lineTo(ex, ey);
+      g.strokePath();
+    }
+  }
+
+  drawBrokenColumn(x, y, w, h) {
+    const g = this.add.graphics().setDepth(0);
+    g.fillStyle(0x22262a, 0.46);
+    g.fillRect(x, y, w, h);
+    g.fillStyle(0x616c7c, 0.18);
+    g.fillRect(x + 5, y + 10, 5, h - 18);
+    g.fillRect(x + w - 10, y + 10, 5, h - 18);
+    g.fillStyle(0x22262a, 0.46);
+    g.beginPath();
+    g.moveTo(x - 4, y + 18);
+    g.lineTo(x + w * 0.5, y - 12);
+    g.lineTo(x + w + 6, y + 16);
+    g.closePath();
+    g.fillPath();
+  }
+
+  drawEclipseBrazier(x, y) {
+    const g = this.add.graphics().setDepth(1);
+    g.fillStyle(0x1c1c2a, 0.92);
+    g.fillRect(x, y, 18, 28);
+    g.fillStyle(0xf0c885, 0.88);
+    g.beginPath();
+    g.moveTo(x + 9, y - 18);
+    g.lineTo(x + 3, y + 4);
+    g.lineTo(x + 15, y + 4);
+    g.closePath();
+    g.fillPath();
+  }
+
+  drawChainCurtainCluster(x, y, width, isAsh) {
+    const color = isAsh ? 0x8074c0 : 0xd7c7a8;
+    const alpha = 0.16;
+    const g = this.add.graphics().setDepth(0);
+    g.lineStyle(1.5, color, alpha);
+    for (let i = 0; i < 6; i++) {
+      const px = x + i * (width / 6) + 8;
+      const len = 40 + (i % 3) * 18;
+      for (let j = 0; j < len; j += 8) {
+        const offsetX = Math.sin(j * 0.08) * 3;
+        g.beginPath();
+        g.moveTo(px + offsetX, y + j);
+        g.lineTo(px + offsetX, y + j + 5);
+        g.strokePath();
+      }
     }
   }
 
