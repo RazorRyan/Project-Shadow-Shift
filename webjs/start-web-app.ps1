@@ -5,8 +5,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$webRoot = Join-Path $projectRoot "Web"
+$webRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
+$projectRoot = Split-Path -Parent $webRoot
 $serverScript = Join-Path $projectRoot "serve-web.ps1"
 $url = "http://localhost:$Port/"
 

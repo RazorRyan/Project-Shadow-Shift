@@ -24,7 +24,37 @@ const {
   getReactionDuration
 } = window.ShadowShiftCombat;
 const { createBossController, resolveBossPhase, chooseBossAttack } = window.ShadowShiftBoss;
-const { meetsRequirements } = window.ShadowShiftWorld;
+const { generateRoomChain } = window.ShadowShiftLayout;
+const {
+  resolveElementalHit,
+  applyEnemyElementalStatus,
+  updateEnemyElementalState,
+  getEnemyElementSpeedMultiplier,
+  getHazardContactProfile,
+  applyEnvironmentElementReaction,
+  updateEnvironmentElementState
+} = window.ShadowShiftElements;
+const {
+  isWorldEntityActive,
+  getEnemyWorldModifier,
+  applyWorldSwapReactiveState
+} = window.ShadowShiftShadow;
+const {
+  ensureReactiveState,
+  getReactivePulse,
+  setReactiveFlag,
+  getReactiveFlag,
+  updateReactiveTimers,
+  triggerReactiveObject
+} = window.ShadowShiftReactivity;
+const {
+  ensurePuzzleRuntime,
+  triggerPuzzleNode,
+  updatePuzzleState,
+  isPuzzleActive,
+  getPuzzleNodeState
+} = window.ShadowShiftPuzzles;
+const { getProgressionState, meetsRequirements } = window.ShadowShiftWorld;
 const { createStateMachine } = window.ShadowShiftStateMachine;
 
 const canvas = document.getElementById("gameCanvas");
@@ -219,15 +249,191 @@ const COLORS = {
   goblin: "#8cb34d",
   shadowWalker: "#6d6fc9",
   demon: "#cf534f",
-  watcher: "#7ed7ff"
+  watcher: "#7ed7ff",
+  bulwark: "#d3c196",
+  hound: "#ff8d6a"
 };
+
+const PROGRESSION_ROUTE_DEFINITIONS = [
+  {
+    id: "recover-dash-core",
+    kind: "main",
+    roomId: "outer-rampart",
+    objective: "Reach the Dash Core",
+    summary: "A forgotten movement relic waits in the rampart.",
+    isAvailable: (targetState) => targetState.pickups.dash.active
+  },
+  {
+    id: "breach-rampart-gate",
+    kind: "main",
+    roomId: "outer-rampart",
+    objective: "Dash through the sealed gate",
+    summary: "Your new momentum can crack open the keep route.",
+    isAvailable: (targetState) => targetState.abilityUnlocked.Dash && targetState.gate.active
+  },
+  {
+    id: "burn-ash-barrier",
+    kind: "main",
+    roomId: "ash-gate",
+    objective: "Use Fire and strike the ash barrier",
+    summary: "The blocked ascent should yield to a burning stance.",
+    isAvailable: (targetState) => !targetState.gate.active && targetState.barrier.active
+  },
+  {
+    id: "claim-umbral-fang",
+    kind: "main",
+    roomId: "umbral-galleries",
+    objective: "Claim the Umbral Fang",
+    summary: "A stronger blade waits deeper in the galleries.",
+    isAvailable: (targetState) => !targetState.barrier.active && targetState.pickups.weapon.active
+  },
+  {
+    id: "revisit-rampart-reliquary",
+    kind: "optional",
+    roomId: "outer-rampart",
+    objective: "Return to the rampart reliquary",
+    summary: "A sealed cache near the opening ledges may answer a stronger blade.",
+    isAvailable: (targetState) => targetState.player.weaponStage >= 1
+      && targetState.abilityUnlocked.Dash
+      && !targetState.progression.optionalSecrets.rampartReliquary
+  },
+  {
+    id: "defeat-eclipse-lord",
+    kind: "main",
+    roomId: "eclipse-throne",
+    objective: "Defeat the Eclipse Lord",
+    summary: "The throne will not open while the lord still stands.",
+    isAvailable: (targetState) => !targetState.pickups.weapon.active && hasBossAlive()
+  },
+  {
+    id: "leave-the-keep",
+    kind: "main",
+    roomId: "eclipse-throne",
+    objective: "Reach the exit shrine",
+    summary: "The route out is finally clear.",
+    isAvailable: (targetState) => !hasBossAlive()
+  }
+];
+
+const PROCEDURAL_ROOM_TEMPLATES = [
+  {
+    id: "rampart-breach",
+    label: "Rampart Breach",
+    role: "start",
+    themes: ["rampart", "ash"],
+    connections: {
+      in: ["entry"],
+      out: ["ground", "climb"]
+    },
+    requirements: null,
+    combatDensity: 1,
+    checkpointSuitable: false,
+    weight: 2
+  },
+  {
+    id: "shadow-span",
+    label: "Shadow Span",
+    role: "mid",
+    themes: ["rampart", "galleries"],
+    connections: {
+      in: ["ground", "climb"],
+      out: ["ground", "shadow"]
+    },
+    requirements: {
+      abilities: ["ShadowSwap"]
+    },
+    combatDensity: 1,
+    checkpointSuitable: false,
+    weight: 2
+  },
+  {
+    id: "dash-crucible",
+    label: "Dash Crucible",
+    role: "mid",
+    themes: ["ash", "galleries"],
+    connections: {
+      in: ["ground", "shadow", "climb"],
+      out: ["ground", "climb"]
+    },
+    requirements: {
+      abilities: ["Dash"]
+    },
+    combatDensity: 2,
+    checkpointSuitable: false,
+    weight: 3
+  },
+  {
+    id: "ember-gauntlet",
+    label: "Ember Gauntlet",
+    role: "mid",
+    themes: ["ash"],
+    connections: {
+      in: ["ground", "climb"],
+      out: ["ground", "checkpoint"]
+    },
+    requirements: {
+      element: "Fire"
+    },
+    combatDensity: 3,
+    checkpointSuitable: false,
+    weight: 1
+  },
+  {
+    id: "galleries-rest",
+    label: "Galleries Rest",
+    role: "mid",
+    themes: ["galleries", "ash"],
+    connections: {
+      in: ["ground", "checkpoint", "climb"],
+      out: ["ground", "climb", "checkpoint"]
+    },
+    requirements: null,
+    combatDensity: 1,
+    checkpointSuitable: true,
+    weight: 2
+  },
+  {
+    id: "reliquary-ascent",
+    label: "Reliquary Ascent",
+    role: "mid",
+    themes: ["galleries", "boss"],
+    connections: {
+      in: ["ground", "climb", "checkpoint"],
+      out: ["ground", "climb"]
+    },
+    requirements: {
+      minWeaponStage: 1
+    },
+    combatDensity: 2,
+    checkpointSuitable: true,
+    weight: 2
+  },
+  {
+    id: "eclipse-approach",
+    label: "Eclipse Approach",
+    role: "finale",
+    themes: ["boss", "galleries"],
+    connections: {
+      in: ["ground", "climb", "checkpoint"],
+      out: ["exit"]
+    },
+    requirements: null,
+    combatDensity: 2,
+    checkpointSuitable: false,
+    weight: 2
+  }
+];
 
 const state = createInitialState();
 initializeStateRuntime(state);
 applyPersistedProgress(state);
+regenerateProceduralLayout(state);
+syncPuzzlePlatforms(state);
 
 function initializeStateRuntime(targetState) {
   initializeEntityRegistry(targetState);
+  initializeReactiveObjects(targetState);
+  initializePuzzles(targetState);
   initializePlayerRuntime(targetState.player);
   targetState.player.maxHp = targetState.player.maxHp ?? targetState.player.hp;
   targetState.player.displayHp = targetState.player.maxHp;
@@ -236,8 +442,11 @@ function initializeStateRuntime(targetState) {
     enemy.displayHp = enemy.maxHp;
     enemy.reactionTimer = enemy.reactionTimer ?? 0;
     enemy.reactionType = enemy.reactionType ?? "none";
+    enemy.elementalState = enemy.elementalState ?? { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 };
+    enemy.worldPhase = enemy.worldPhase ?? getEnemyWorldModifier(enemy, targetState);
     initializeEnemyRuntime(enemy);
   }
+  applyWorldSwapReactiveState(targetState);
 }
 
 function initializeEntityRegistry(targetState) {
@@ -265,6 +474,37 @@ function initializeEntityRegistry(targetState) {
       kind: hazard.kind ?? "hazard"
     });
   }
+
+  for (const cache of targetState.secretCaches ?? []) {
+    targetState.entities.register("secret", cache, {
+      reward: cache.reward?.type ?? "secret"
+    });
+  }
+}
+
+function getReactiveObjects(targetState) {
+  return [
+    targetState.gate,
+    targetState.barrier,
+    ...(targetState.checkpoints ?? []),
+    ...(targetState.secretCaches ?? [])
+  ].filter(Boolean);
+}
+
+function initializeReactiveObjects(targetState) {
+  for (const object of getReactiveObjects(targetState)) {
+    ensureReactiveState(object);
+  }
+}
+
+function getPuzzleById(targetState, puzzleId) {
+  return (targetState.puzzles ?? []).find((puzzle) => puzzle.id === puzzleId) ?? null;
+}
+
+function initializePuzzles(targetState) {
+  for (const puzzle of targetState.puzzles ?? []) {
+    ensurePuzzleRuntime(puzzle);
+  }
 }
 
 function getRoomById(targetState, roomId) {
@@ -284,8 +524,9 @@ function enterRoom(targetState, roomId) {
   const room = getRoomById(targetState, roomId);
   targetState.currentRoomId = room.id;
   targetState.roomState.visitedRooms[room.id] = true;
+  regenerateProceduralLayout(targetState);
   if (targetState === state && targetState.started && !targetState.gameWon && !targetState.isDead) {
-    showMessage(`${room.label}${room.objectiveHint ? `: ${room.objectiveHint}` : ""}`, 2.1);
+    showMessage(`${room.label}: ${getRoomProgressionHint(targetState, room)}`, 2.1);
   }
 }
 
@@ -307,9 +548,97 @@ function getRoomEntities(targetState, roomId) {
   return {
     pickups: Object.values(targetState.pickups).filter((pickup) => pickup.roomId === roomId),
     checkpoints: targetState.checkpoints.filter((checkpoint) => checkpoint.roomId === roomId),
+    secrets: (targetState.secretCaches ?? []).filter((cache) => cache.roomId === roomId),
     blockers: [targetState.gate, targetState.barrier].filter((entry) => entry.roomId === roomId),
     exitZone: targetState.exitZone.roomId === roomId ? targetState.exitZone : null
   };
+}
+
+function buildProceduralLayoutSeed(targetState) {
+  const progression = getProgressionState(targetState);
+  return [
+    targetState.levelName,
+    progression.abilities.Dash ? "dash" : "no-dash",
+    progression.weaponStage >= 1 ? "weapon-2" : "weapon-1",
+    progression.worldFlags.barrierCleared ? "barrier-open" : "barrier-sealed",
+    targetState.proceduralLayout?.rerollCount ?? 0
+  ].join(":");
+}
+
+function regenerateProceduralLayout(targetState) {
+  const progression = getProgressionState(targetState);
+  const seed = buildProceduralLayoutSeed(targetState);
+  const desiredTheme = getCurrentRoom(targetState)?.theme ?? "rampart";
+  const generated = generateRoomChain(PROCEDURAL_ROOM_TEMPLATES, {
+    seed,
+    chainLength: 4,
+    theme: desiredTheme,
+    requirementState: progression,
+    maxCombatDensity: progression.weaponStage >= 1 ? 3 : 2,
+    preferCheckpoint: true,
+    meetsRequirements: (requirements, requirementState) => {
+      if (!requirements) {
+        return true;
+      }
+      return meetsRequirements(requirements, targetState, { requirementState });
+    }
+  });
+
+  targetState.proceduralLayout.seed = generated.seed;
+  targetState.proceduralLayout.route = generated.chain;
+  targetState.proceduralLayout.validation = generated.validation;
+}
+
+function syncPuzzlePlatforms(targetState) {
+  for (const platform of targetState.puzzlePlatforms ?? []) {
+    const puzzle = getPuzzleById(targetState, platform.sourcePuzzleId);
+    platform.active = Boolean(puzzle && isPuzzleActive(puzzle));
+  }
+}
+
+function setProgressionFlag(targetState, category, flagId, value = true) {
+  if (!targetState.progression?.[category]) {
+    return;
+  }
+  targetState.progression[category][flagId] = value;
+}
+
+function getCurrentProgressionRoute(targetState) {
+  return PROGRESSION_ROUTE_DEFINITIONS.find((route) => route.kind === "main" && route.isAvailable(targetState)) ?? null;
+}
+
+function getAvailableOptionalRoutes(targetState) {
+  return PROGRESSION_ROUTE_DEFINITIONS.filter((route) => route.kind === "optional" && route.isAvailable(targetState));
+}
+
+function getRoomProgressionHint(targetState, room) {
+  const mainRoute = getCurrentProgressionRoute(targetState);
+  if (mainRoute?.roomId === room.id) {
+    return mainRoute.objective;
+  }
+
+  const optionalRoute = getAvailableOptionalRoutes(targetState).find((route) => route.roomId === room.id);
+  if (optionalRoute) {
+    return optionalRoute.summary;
+  }
+
+  return room.objectiveHint ?? room.revisitHint ?? "Press onward through the keep";
+}
+
+function announceProgressionRoute(targetState, force = false) {
+  const route = getCurrentProgressionRoute(targetState);
+  if (!route) {
+    return;
+  }
+
+  if (!force && targetState.routeState.lastAnnouncedRouteId === route.id) {
+    return;
+  }
+
+  targetState.routeState.lastAnnouncedRouteId = route.id;
+  if (targetState === state && targetState.started && !targetState.gameWon && !targetState.isDead) {
+    showMessage(route.summary, 2.8);
+  }
 }
 
 function initializePlayerRuntime(player) {
@@ -438,6 +767,16 @@ function createBossAttackCatalog(enemy) {
   ];
 }
 
+function isBulwarkGuardingFront(enemy, hitbox) {
+  if (enemy.type !== "bulwark") {
+    return false;
+  }
+
+  const hitDirection = Math.sign((hitbox.x + hitbox.w * 0.5) - (enemy.x + enemy.w * 0.5)) || enemy.guardFacing || enemy.patrolDirection || 1;
+  const facing = enemy.guardFacing || enemy.patrolDirection || 1;
+  return hitDirection === facing;
+}
+
 function getEnemyState(enemy) {
   if (!enemy.aiStateMachine) {
     initializeEnemyRuntime(enemy);
@@ -509,10 +848,14 @@ function getEnemyMoveSettings(enemy) {
   switch (enemy.type) {
     case "goblin":
       return { accel: 900, decel: 980, turnSpeed: 1350 };
+    case "hound":
+      return { accel: 1180, decel: 980, turnSpeed: 1560 };
     case "shadowWalker":
       return { accel: 760, decel: 820, turnSpeed: 1220 };
     case "demon":
       return { accel: 680, decel: 760, turnSpeed: 1180 };
+    case "bulwark":
+      return { accel: 520, decel: 720, turnSpeed: 760 };
     case "watcher":
       return { accel: 520, decel: 560, turnSpeed: 860 };
     case "oracle":
@@ -679,6 +1022,23 @@ function createInitialState() {
       IceShift: true,
       WindShift: true
     },
+    progression: {
+      keyItems: {
+        MoonSeal: false
+      },
+      worldFlags: {
+        gateOpened: false,
+        barrierCleared: false,
+        bossAwakened: false,
+        bossDefeated: false
+      },
+      optionalSecrets: {
+        rampartReliquary: false
+      }
+    },
+    routeState: {
+      lastAnnouncedRouteId: null
+    },
     messageTimer: 0,
     started: false,
     gameWon: false,
@@ -687,7 +1047,23 @@ function createInitialState() {
       showStateLabels: false,
       showCombatBoxes: false,
       showRequirements: false,
-      showSaveState: false
+      showSaveState: false,
+      showProceduralLayout: false
+    },
+    proceduralLayout: {
+      seed: "eclipse-keep-v1",
+      rerollCount: 0,
+      route: [],
+      validation: {
+        valid: true,
+        errors: []
+      }
+    },
+    environment: {
+      shadowRestEchoTimer: 0
+    },
+    puzzleState: {
+      debugVisible: false
     },
     rooms: [
       {
@@ -696,7 +1072,8 @@ function createInitialState() {
         theme: "rampart",
         spawnCheckpointId: "start",
         label: "Outer Rampart",
-        objectiveHint: "Reach the Dash Core"
+        objectiveHint: "Reach the Dash Core",
+        revisitHint: "The opening ledges hide an old reliquary."
       },
       {
         id: "ash-gate",
@@ -815,7 +1192,8 @@ function createInitialState() {
         baseSpeed: 98,
         contactDamage: 1,
         alive: true,
-        contactCooldown: 0
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
       },
       {
         type: "watcher",
@@ -840,7 +1218,8 @@ function createInitialState() {
         baseY: 336,
         contactDamage: 1,
         alive: true,
-        contactCooldown: 0
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
       },
       {
         type: "demon",
@@ -864,7 +1243,8 @@ function createInitialState() {
         baseSpeed: 64,
         contactDamage: 1,
         alive: true,
-        contactCooldown: 0
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
       },
       {
         type: "shadowWalker",
@@ -888,7 +1268,33 @@ function createInitialState() {
         baseSpeed: 112,
         contactDamage: 1,
         alive: true,
-        contactCooldown: 0
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
+      },
+      {
+        type: "hound",
+        name: "Ash Hound",
+        x: 1880,
+        y: 566,
+        w: 44,
+        h: 40,
+        vx: 126,
+        left: 1760,
+        right: 1980,
+        hp: 3,
+        displayHp: 3,
+        invuln: 0,
+        hurtTimer: 0,
+        knockbackTimer: 0,
+        behaviorTimer: 0.9,
+        pauseTimer: 0,
+        burstTimer: 0,
+        alertCooldown: 0.65,
+        baseSpeed: 132,
+        contactDamage: 1,
+        alive: true,
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
       },
       {
         type: "watcher",
@@ -913,7 +1319,34 @@ function createInitialState() {
         baseY: 322,
         contactDamage: 1,
         alive: true,
-        contactCooldown: 0
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
+      },
+      {
+        type: "bulwark",
+        name: "Ash Bulwark",
+        x: 2920,
+        y: 548,
+        w: 58,
+        h: 72,
+        vx: 58,
+        left: 2860,
+        right: 3140,
+        hp: 6,
+        displayHp: 6,
+        invuln: 0,
+        hurtTimer: 0,
+        knockbackTimer: 0,
+        behaviorTimer: 1.2,
+        pauseTimer: 0,
+        burstTimer: 0,
+        alertCooldown: 1.5,
+        baseSpeed: 46,
+        contactDamage: 2,
+        guardFacing: -1,
+        alive: true,
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
       },
       {
         type: "shadowWalker",
@@ -937,7 +1370,8 @@ function createInitialState() {
         baseSpeed: 86,
         contactDamage: 1,
         alive: true,
-        contactCooldown: 0
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
       },
       {
         type: "oracle",
@@ -963,18 +1397,134 @@ function createInitialState() {
         awakened: false,
         boss: true,
         alive: true,
-        contactCooldown: 0
+        contactCooldown: 0,
+        elementalState: { type: "none", timer: 0, tickTimer: 0, sourceElement: "None", slowMultiplier: 1, tickDamage: 0 }
       }
     ],
     pickups: {
       dash: { x: 880, y: 574, w: 28, h: 28, active: true, label: "Dash Core", roomId: "outer-rampart" },
       weapon: { x: 2580, y: 354, w: 28, h: 28, active: true, label: "Umbral Fang", roomId: "umbral-galleries" }
     },
+    secretCaches: [
+      {
+        id: "rampart-reliquary",
+        x: 310,
+        y: 490,
+        w: 28,
+        h: 28,
+        active: true,
+        label: "Rampart Reliquary",
+        roomId: "outer-rampart",
+        requirements: {
+          abilities: ["Dash"],
+          minWeaponStage: 1
+        },
+        reward: {
+          type: "maxHp",
+          amount: 1,
+          secretId: "rampartReliquary",
+          keyItem: "MoonSeal"
+        },
+        reactivity: {
+          triggers: ["approach", "swap"],
+          responses: {
+            approach: {
+              message: null
+            },
+            swap: {
+              setFlag: "shadowRevealed"
+            }
+          }
+        },
+        feedbackTimer: 0,
+        failureMessage: "The reliquary yields only to a stronger blade"
+      }
+    ],
     checkpoints: [
-      { id: "start", x: 120, y: 540, w: 28, h: 72, label: "Outer Rampart", active: true, roomId: "outer-rampart" },
-      { id: "gate", x: 1120, y: 548, w: 28, h: 72, label: "Ash Gate", active: false, roomId: "outer-rampart" },
-      { id: "sanctum", x: 2540, y: 338, w: 28, h: 72, label: "Umbral Galleries", active: false, roomId: "umbral-galleries" },
-      { id: "boss", x: 3460, y: 548, w: 28, h: 72, label: "Eclipse Throne", active: false, roomId: "eclipse-throne" }
+      {
+        id: "start",
+        x: 120,
+        y: 540,
+        w: 28,
+        h: 72,
+        label: "Outer Rampart",
+        active: true,
+        roomId: "outer-rampart",
+        reactivity: {
+          triggers: ["rest", "swap"],
+          responses: {
+            rest: {
+              setFlag: "recentlyRested"
+            },
+            swap: {
+              setFlag: "worldEcho"
+            }
+          }
+        }
+      },
+      {
+        id: "gate",
+        x: 1120,
+        y: 548,
+        w: 28,
+        h: 72,
+        label: "Ash Gate",
+        active: false,
+        roomId: "outer-rampart",
+        reactivity: {
+          triggers: ["rest", "swap"],
+          responses: {
+            rest: {
+              setFlag: "recentlyRested"
+            },
+            swap: {
+              setFlag: "worldEcho"
+            }
+          }
+        }
+      },
+      {
+        id: "sanctum",
+        x: 2540,
+        y: 338,
+        w: 28,
+        h: 72,
+        label: "Umbral Galleries",
+        active: false,
+        roomId: "umbral-galleries",
+        reactivity: {
+          triggers: ["rest", "swap"],
+          responses: {
+            rest: {
+              setFlag: "recentlyRested"
+            },
+            swap: {
+              setFlag: "worldEcho"
+            }
+          }
+        }
+      },
+      {
+        id: "boss",
+        x: 3460,
+        y: 548,
+        w: 28,
+        h: 72,
+        label: "Eclipse Throne",
+        active: false,
+        roomId: "eclipse-throne",
+        reactivity: {
+          triggers: ["rest", "swap"],
+          responses: {
+            rest: {
+              setFlag: "recentlyRested"
+            },
+            swap: {
+              setFlag: "worldEcho"
+            }
+          }
+        }
+      }
     ],
     gate: {
       x: 1030,
@@ -985,6 +1535,20 @@ function createInitialState() {
       roomId: "outer-rampart",
       requirements: {
         abilities: ["Dash"]
+      },
+      reactivity: {
+        triggers: ["approach", "attack", "swap"],
+        responses: {
+          approach: {
+            message: null
+          },
+          attack: {
+            message: null
+          },
+          swap: {
+            setFlag: "worldEcho"
+          }
+        }
       },
       failureMessage: "The path is sealed without Dash"
     },
@@ -997,6 +1561,17 @@ function createInitialState() {
       roomId: "ash-gate",
       requirements: {
         element: "Fire"
+      },
+      reactivity: {
+        triggers: ["attack", "swap"],
+        responses: {
+          attack: {
+            message: null
+          },
+          swap: {
+            setFlag: "worldEcho"
+          }
+        }
       },
       failureMessage: "Fire is needed here"
     },
@@ -1049,13 +1624,57 @@ function createInitialState() {
       { x: 3348, y: 338, w: 96, h: 14, world: "Shadow" },
       { x: 3648, y: 308, w: 96, h: 14, world: "Shadow" }
     ],
+    puzzlePlatforms: [
+      {
+        id: "ash-echo-bridge",
+        x: 2160,
+        y: 438,
+        w: 110,
+        h: 14,
+        world: "Shadow",
+        sourcePuzzleId: "ash-echo-bridge",
+        active: false
+      }
+    ],
+    puzzles: [
+      {
+        id: "ash-echo-bridge",
+        label: "Ash Echo Bridge",
+        roomId: "ash-gate",
+        persistent: false,
+        windowDuration: 7,
+        nodes: [
+          {
+            id: "ember-altar",
+            label: "Ember Altar",
+            x: 2050,
+            y: 586,
+            radius: 36,
+            triggerType: "attack",
+            requiredElement: "Fire",
+            requiredWorld: "Light",
+            duration: 5
+          },
+          {
+            id: "shadow-anchor",
+            label: "Shadow Anchor",
+            x: 2190,
+            y: 472,
+            radius: 34,
+            triggerType: "swap",
+            requiredWorld: "Shadow",
+            duration: 5
+          }
+        ]
+      }
+    ],
     hazards: [
-      { x: 468, y: 604, w: 34, h: 16, damage: 1, kind: "spikes" },
-      { x: 1148, y: 604, w: 96, h: 16, damage: 1, kind: "spikes" },
-      { x: 1548, y: 604, w: 54, h: 16, damage: 1, kind: "spikes" },
-      { x: 2198, y: 604, w: 164, h: 16, damage: 1, kind: "spikes" },
-      { x: 3010, y: 604, w: 90, h: 16, damage: 1, kind: "spikes" },
-      { x: 3370, y: 604, w: 74, h: 16, damage: 1, kind: "spikes" }
+      { x: 468, y: 604, w: 34, h: 16, damage: 1, kind: "spikes", element: "Ice", dampenedTimer: 0, world: "Both" },
+      { x: 1148, y: 604, w: 96, h: 16, damage: 1, kind: "spikes", element: "Ice", dampenedTimer: 0, world: "Light" },
+      { x: 1548, y: 604, w: 54, h: 16, damage: 1, kind: "spikes", element: "Ice", dampenedTimer: 0, world: "Both" },
+      { x: 2198, y: 604, w: 164, h: 16, damage: 1, kind: "spikes", element: "Ice", dampenedTimer: 0, world: "Light" },
+      { x: 3010, y: 604, w: 90, h: 16, damage: 1, kind: "spikes", element: "Ice", dampenedTimer: 0, world: "Shadow" },
+      { x: 3370, y: 604, w: 74, h: 16, damage: 1, kind: "spikes", element: "Ice", dampenedTimer: 0, world: "Both" }
     ],
     walls: [
       { x: 1120, y: 430, w: 30, h: 190 },
@@ -1070,7 +1689,7 @@ function createInitialState() {
 
 function getDefaultProgress() {
   return {
-    version: 2,
+    version: 3,
     progression: {
       abilities: {
         Dash: false
@@ -1080,6 +1699,18 @@ function getDefaultProgress() {
         IceShift: true,
         WindShift: true,
         ShadowSwap: true
+      },
+      keyItems: {
+        MoonSeal: false
+      },
+      worldFlags: {
+        gateOpened: false,
+        barrierCleared: false,
+        bossAwakened: false,
+        bossDefeated: false
+      },
+      optionalSecrets: {
+        rampartReliquary: false
       }
     },
     upgrades: {
@@ -1108,9 +1739,9 @@ function loadProgress() {
       return getDefaultProgress();
     }
     const parsed = JSON.parse(raw);
-    if (parsed.version === 2) {
+    if (parsed.version === 3) {
       return {
-        version: 2,
+        version: 3,
         progression: {
           abilities: {
             Dash: Boolean(parsed.progression?.abilities?.Dash)
@@ -1120,6 +1751,63 @@ function loadProgress() {
             IceShift: parsed.progression?.elements?.IceShift !== false,
             WindShift: parsed.progression?.elements?.WindShift !== false,
             ShadowSwap: parsed.progression?.elements?.ShadowSwap !== false
+          },
+          keyItems: {
+            MoonSeal: Boolean(parsed.progression?.keyItems?.MoonSeal)
+          },
+          worldFlags: {
+            gateOpened: Boolean(parsed.progression?.worldFlags?.gateOpened),
+            barrierCleared: Boolean(parsed.progression?.worldFlags?.barrierCleared),
+            bossAwakened: Boolean(parsed.progression?.worldFlags?.bossAwakened),
+            bossDefeated: Boolean(parsed.progression?.worldFlags?.bossDefeated)
+          },
+          optionalSecrets: {
+            rampartReliquary: Boolean(parsed.progression?.optionalSecrets?.rampartReliquary)
+          }
+        },
+        upgrades: {
+          weaponStage: parsed.upgrades?.weaponStage >= 1 ? 1 : 0
+        },
+        checkpoint: {
+          id: typeof parsed.checkpoint?.id === "string" ? parsed.checkpoint.id : "start",
+          roomId: typeof parsed.checkpoint?.roomId === "string" ? parsed.checkpoint.roomId : "outer-rampart"
+        },
+        roomFlags: {
+          visitedRooms: typeof parsed.roomFlags?.visitedRooms === "object" && parsed.roomFlags?.visitedRooms
+            ? parsed.roomFlags.visitedRooms
+            : { "outer-rampart": true },
+          pickups: {
+            dashCollected: Boolean(parsed.roomFlags?.pickups?.dashCollected),
+            weaponCollected: Boolean(parsed.roomFlags?.pickups?.weaponCollected)
+          }
+        }
+      };
+    }
+
+    if (parsed.version === 2) {
+      return {
+        version: 3,
+        progression: {
+          abilities: {
+            Dash: Boolean(parsed.progression?.abilities?.Dash)
+          },
+          elements: {
+            FireShift: parsed.progression?.elements?.FireShift !== false,
+            IceShift: parsed.progression?.elements?.IceShift !== false,
+            WindShift: parsed.progression?.elements?.WindShift !== false,
+            ShadowSwap: parsed.progression?.elements?.ShadowSwap !== false
+          },
+          keyItems: {
+            MoonSeal: false
+          },
+          worldFlags: {
+            gateOpened: false,
+            barrierCleared: false,
+            bossAwakened: false,
+            bossDefeated: false
+          },
+          optionalSecrets: {
+            rampartReliquary: false
           }
         },
         upgrades: {
@@ -1142,7 +1830,7 @@ function loadProgress() {
     }
 
     return {
-      version: 2,
+      version: 3,
       progression: {
         abilities: {
           Dash: Boolean(parsed.dashUnlocked)
@@ -1152,6 +1840,18 @@ function loadProgress() {
           IceShift: true,
           WindShift: true,
           ShadowSwap: true
+        },
+        keyItems: {
+          MoonSeal: false
+        },
+        worldFlags: {
+          gateOpened: false,
+          barrierCleared: false,
+          bossAwakened: false,
+          bossDefeated: false
+        },
+        optionalSecrets: {
+          rampartReliquary: false
         }
       },
       upgrades: {
@@ -1179,7 +1879,7 @@ function loadProgress() {
 function getSavePayload(targetState) {
   const checkpoint = getCheckpointById(targetState, targetState.savedCheckpointId);
   return {
-    version: 2,
+    version: 3,
     progression: {
       abilities: {
         Dash: targetState.abilityUnlocked.Dash
@@ -1189,6 +1889,18 @@ function getSavePayload(targetState) {
         IceShift: targetState.abilityUnlocked.IceShift,
         WindShift: targetState.abilityUnlocked.WindShift,
         ShadowSwap: targetState.abilityUnlocked.ShadowSwap
+      },
+      keyItems: {
+        MoonSeal: targetState.progression.keyItems.MoonSeal
+      },
+      worldFlags: {
+        gateOpened: targetState.progression.worldFlags.gateOpened,
+        barrierCleared: targetState.progression.worldFlags.barrierCleared,
+        bossAwakened: targetState.progression.worldFlags.bossAwakened,
+        bossDefeated: targetState.progression.worldFlags.bossDefeated
+      },
+      optionalSecrets: {
+        rampartReliquary: targetState.progression.optionalSecrets.rampartReliquary
       }
     },
     upgrades: {
@@ -1224,12 +1936,33 @@ function applyPersistedProgress(targetState) {
   targetState.abilityUnlocked.IceShift = progress.progression.elements.IceShift;
   targetState.abilityUnlocked.WindShift = progress.progression.elements.WindShift;
   targetState.abilityUnlocked.ShadowSwap = progress.progression.elements.ShadowSwap;
+  targetState.progression.keyItems.MoonSeal = progress.progression.keyItems.MoonSeal;
+  targetState.progression.worldFlags.gateOpened = progress.progression.worldFlags.gateOpened;
+  targetState.progression.worldFlags.barrierCleared = progress.progression.worldFlags.barrierCleared;
+  targetState.progression.worldFlags.bossAwakened = progress.progression.worldFlags.bossAwakened;
+  targetState.progression.worldFlags.bossDefeated = progress.progression.worldFlags.bossDefeated;
+  targetState.progression.optionalSecrets.rampartReliquary = progress.progression.optionalSecrets.rampartReliquary;
   targetState.player.weaponStage = progress.upgrades.weaponStage;
   targetState.pickups.dash.active = !progress.roomFlags.pickups.dashCollected;
   targetState.pickups.weapon.active = !progress.roomFlags.pickups.weaponCollected;
+  targetState.barrier.active = !progress.progression.worldFlags.barrierCleared;
+  targetState.bossIntroShown = progress.progression.worldFlags.bossAwakened;
+  if (targetState.secretCaches?.length) {
+    targetState.secretCaches[0].active = !progress.progression.optionalSecrets.rampartReliquary;
+  }
+  if (progress.progression.worldFlags.bossDefeated) {
+    for (const enemy of targetState.enemies) {
+      if (enemy.boss) {
+        enemy.alive = false;
+      }
+    }
+  }
   targetState.roomState.visitedRooms = progress.roomFlags.visitedRooms ?? { "outer-rampart": true };
   setSavedCheckpoint(targetState, progress.checkpoint.id, false);
   spawnPlayerAtCheckpoint(targetState, targetState.player, progress.checkpoint.id);
+  targetState.routeState.lastAnnouncedRouteId = null;
+  regenerateProceduralLayout(targetState);
+  syncPuzzlePlatforms(targetState);
 }
 
 function setSavedCheckpoint(targetState, checkpointId, shouldSave = true) {
@@ -1260,6 +1993,61 @@ function spawnPlayerAtCheckpoint(targetState, player, checkpointId) {
   updateCurrentRoom(targetState, player);
 }
 
+function performWorldSwap(targetState, reason = "manual") {
+  if (!targetState.abilityUnlocked.ShadowSwap) {
+    return false;
+  }
+
+  targetState.world = targetState.world === "Light" ? "Shadow" : "Light";
+  const summary = applyWorldSwapReactiveState(targetState);
+
+  for (const enemy of targetState.enemies) {
+    if (!enemy.alive) {
+      continue;
+    }
+    if (enemy.worldPhase?.phase === "exposed") {
+      enemy.reactionTimer = Math.max(enemy.reactionTimer, 0.14);
+      enemy.reactionType = "elemental";
+    }
+  }
+
+  for (const reactiveObject of getReactiveObjects(targetState)) {
+    triggerReactiveObject(reactiveObject, {
+      type: "swap",
+      world: targetState.world
+    });
+  }
+
+  for (const puzzle of targetState.puzzles ?? []) {
+    for (const node of puzzle.nodes ?? []) {
+      const dx = (targetState.player.x + targetState.player.w * 0.5) - node.x;
+      const dy = (targetState.player.y + targetState.player.h * 0.5) - node.y;
+      if (Math.hypot(dx, dy) > node.radius + 18) {
+        continue;
+      }
+      const result = triggerPuzzleNode(puzzle, node.id, "swap", {
+        world: targetState.world,
+        element: targetState.element
+      });
+      if (result.accepted && targetState === state) {
+        syncPuzzlePlatforms(targetState);
+        showMessage(result.solved ? `${puzzle.label} opens a spectral route` : `${node.label} resonates`, 2.2);
+      }
+    }
+  }
+
+  if (targetState === state) {
+    const swapText = summary.exposedEnemies > 0
+      ? `${summary.exposedEnemies} foe${summary.exposedEnemies === 1 ? "" : "s"} exposed`
+      : summary.empoweredEnemies > 0
+        ? `${summary.empoweredEnemies} foe${summary.empoweredEnemies === 1 ? "" : "s"} empowered`
+        : `${summary.activeHazards} hazards aligned`;
+    showMessage(`World shifted to ${targetState.world} (${swapText})`, reason === "manual" ? 2.3 : 2);
+  }
+
+  return true;
+}
+
 function handleKeyDown(code) {
   const player = state.player;
   const movement = getMovementTuning(state, player);
@@ -1277,8 +2065,7 @@ function handleKeyDown(code) {
   }
 
   if (code === "KeyE" && state.abilityUnlocked.ShadowSwap) {
-    state.world = state.world === "Light" ? "Shadow" : "Light";
-    showMessage(`World shifted to ${state.world}`);
+    performWorldSwap(state);
   }
 
   if (code === "KeyR") {
@@ -1307,6 +2094,23 @@ function handleKeyDown(code) {
   if (code === "BracketRight") {
     state.debug.showSaveState = !state.debug.showSaveState;
     showMessage(`Save overlay ${state.debug.showSaveState ? "enabled" : "disabled"}`);
+  }
+
+  if (code === "Quote") {
+    state.puzzleState.debugVisible = !state.puzzleState.debugVisible;
+    showMessage(`Puzzle overlay ${state.puzzleState.debugVisible ? "enabled" : "disabled"}`);
+  }
+
+  if (code === "KeyL") {
+    if (state.debug.showProceduralLayout) {
+      state.proceduralLayout.rerollCount += 1;
+      regenerateProceduralLayout(state);
+      showMessage(`Challenge route rerolled (${state.proceduralLayout.seed})`, 2.4);
+    } else {
+      state.debug.showProceduralLayout = true;
+      regenerateProceduralLayout(state);
+      showMessage("Procedural route overlay enabled");
+    }
   }
 
   if (code === "Digit1" && state.abilityUnlocked.FireShift) {
@@ -1348,8 +2152,7 @@ function handleTouchAction(action) {
 
   if (action === "swap") {
     if (state.abilityUnlocked.ShadowSwap) {
-      state.world = state.world === "Light" ? "Shadow" : "Light";
-      showMessage(`World shifted to ${state.world}`);
+      performWorldSwap(state);
     }
     return;
   }
@@ -1411,7 +2214,8 @@ function startRun() {
   state.started = true;
   hud.startOverlay.classList.add("hidden");
   spawnPlayerAtCheckpoint(state, state.player, "start");
-  showMessage("Collect Dash, cross the gate, rest at shrines, burn the barrier, reach the exit", 4);
+  regenerateProceduralLayout(state);
+  announceProgressionRoute(state, true);
 }
 
 function showDeathOverlay(reason) {
@@ -1451,7 +2255,18 @@ function tryRestAtCheckpoint() {
   state.player.hp = state.player.maxHp;
   state.player.displayHp = state.player.maxHp;
   state.player.invuln = 0.3;
-  showMessage(`Rested at ${checkpoint.label}`);
+  triggerReactiveObject(checkpoint, {
+    type: "rest",
+    world: state.world
+  });
+  if (state.world === "Shadow") {
+    state.environment.shadowRestEchoTimer = 7;
+    setReactiveFlag(checkpoint, "shadowBlessing", true);
+  } else {
+    state.environment.shadowRestEchoTimer = 0;
+    setReactiveFlag(checkpoint, "shadowBlessing", false);
+  }
+  showMessage(state.world === "Shadow" ? `Rested at ${checkpoint.label}; the shrine echoes through Shadow` : `Rested at ${checkpoint.label}`);
   spawnImpactParticles(checkpoint.x + checkpoint.w * 0.5, checkpoint.y + 14, "#efe0b1", 12, 0.8);
   return true;
 }
@@ -1469,6 +2284,7 @@ function restartLevelFromBeginning(message = "The warrior returns to the gate") 
   hideMessage();
   hud.startOverlay.classList.add("hidden");
   spawnPlayerAtCheckpoint(state, state.player, "start");
+  regenerateProceduralLayout(state);
   showMessage(message, 3);
 }
 
@@ -1485,6 +2301,7 @@ function respawnFromSavedCheckpoint(message = "The warrior rises again") {
   hideMessage();
   hud.startOverlay.classList.add("hidden");
   spawnPlayerAtCheckpoint(state, state.player, state.savedCheckpointId);
+  regenerateProceduralLayout(state);
   showMessage(message, 2.8);
 }
 
@@ -1684,12 +2501,30 @@ function createPlayerAttackHitbox(player, profile, attackBox) {
 
 function applyEnemyHit(enemy, hitbox) {
   const impact = getEnemyImpactTuning(enemy);
-  const damage = hitbox.damage;
+  if (isBulwarkGuardingFront(enemy, hitbox) && !enemy.elementalState?.type?.includes?.("gust")) {
+    enemy.reactionTimer = Math.max(enemy.reactionTimer, 0.14);
+    enemy.reactionType = "elemental";
+    enemy.hurtTimer = Math.max(enemy.hurtTimer, 0.08);
+    enemy.lastHitElement = hitbox.element;
+    enemy.staggeredByLastHit = false;
+    return {
+      damage: 0,
+      reactionType: "elemental",
+      impactPower: 0,
+      shouldStagger: false,
+      hitstopBonus: 0.002,
+      reactionText: "guarded",
+      defeated: false
+    };
+  }
+  const elementalResult = resolveElementalHit(enemy, hitbox);
+  const worldPhase = enemy.worldPhase ?? getEnemyWorldModifier(enemy, state);
+  const damage = Math.max(1, Math.round(elementalResult.damage * worldPhase.damageTakenMultiplier));
   const reactionType = getReactionTypeFromHit(hitbox);
   const reactionDuration = getReactionDuration(reactionType);
-  const impactPower = hitbox.impactPower ?? getImpactPowerForHit(hitbox);
+  const impactPower = (hitbox.impactPower ?? getImpactPowerForHit(hitbox)) + elementalResult.impactBonus;
   const knockbackScale = impact.knockbackScale / Math.max(0.65, impact.weight);
-  const knockbackX = hitbox.knockbackX * knockbackScale;
+  const knockbackX = hitbox.knockbackX * knockbackScale * elementalResult.knockbackMultiplier;
   const staggerTime = hitbox.staggerTime * impact.staggerScale;
   const shouldStagger = impactPower >= impact.staggerThreshold || reactionType === "finisher";
 
@@ -1705,6 +2540,7 @@ function applyEnemyHit(enemy, hitbox) {
   enemy.lastImpactPower = impactPower;
   enemy.lastKnockbackX = knockbackX;
   enemy.staggeredByLastHit = shouldStagger;
+  applyEnemyElementalStatus(enemy, elementalResult);
   if (shouldStagger) {
     beginEnemyStagger(enemy, Math.max(0.08, staggerTime));
   }
@@ -1714,7 +2550,8 @@ function applyEnemyHit(enemy, hitbox) {
     reactionType,
     impactPower,
     shouldStagger,
-    hitstopBonus: impact.hitstopBonus ?? 0,
+    hitstopBonus: (impact.hitstopBonus ?? 0) + elementalResult.hitstopBonus,
+    reactionText: elementalResult.reactionText,
     defeated: enemy.hp <= 0
   };
 }
@@ -1768,31 +2605,90 @@ function tryAttack(mode = "auto") {
     const shakeStrength = result.reactionType === "finisher" ? 8 : result.reactionType === "heavy" ? 7 : 6;
     applyHitStop(baseHitStop + result.hitstopBonus, shakeStrength);
     spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.45, profile.slashColor, profile.finisher ? 12 : 8);
-    showMessage(`${enemy.name} hit for ${result.damage}${result.shouldStagger ? " and staggered" : ""}`);
+    showMessage(`${enemy.name} hit for ${result.damage}${result.reactionText ? ` (${result.reactionText})` : ""}${result.shouldStagger ? " and staggered" : ""}`);
     if (isPogoAttackProfile(profile) && !pogoTarget) {
       pogoTarget = createPogoTarget("enemy", enemy);
     }
     if (result.defeated) {
-      enemy.alive = false;
-      applyHitStop(0.07, 8);
-      spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.45, "#fff6dc", 12, 1.25);
-      showMessage(`${enemy.name} defeated`);
+      handleEnemyDefeat(enemy);
+    }
+  }
+
+  for (const entity of state.entities.getByType("hazard")) {
+    const hazard = entity.source;
+    if (!overlapsHitbox(attackHitbox, hazard)) {
+      continue;
+    }
+    const hazardReaction = applyEnvironmentElementReaction("hazard", hazard, attackHitbox.element);
+    if (hazardReaction.changed) {
+      landedHit = true;
+      spawnImpactParticles(hazard.x + hazard.w * 0.5, hazard.y + 4, hazardReaction.color ?? "#fff0c2", 8, 0.8);
+      showMessage(hazardReaction.message);
     }
   }
 
   if (state.barrier.active && overlapsHitbox(attackBox, state.barrier)) {
+    triggerReactiveObject(state.barrier, {
+      type: "attack",
+      actor: state.player,
+      element: attackHitbox.element
+    });
+    const barrierReaction = applyEnvironmentElementReaction("barrier", state.barrier, attackHitbox.element);
     if (isPogoAttackProfile(profile)) {
       landedHit = true;
       pogoTarget = pogoTarget ?? createPogoTarget("barrier", state.barrier);
       spawnImpactParticles(state.barrier.x + state.barrier.w * 0.5, state.barrier.y + 18, "#f7d8c4", 8, 0.9);
-    } else if (meetsRequirements(state.barrier.requirements, state)) {
+    } else if (barrierReaction.outcome === "clear" || meetsRequirements(state.barrier.requirements, state)) {
       state.barrier.active = false;
+      setProgressionFlag(state, "worldFlags", "barrierCleared", true);
+      regenerateProceduralLayout(state);
       landedHit = true;
       applyHitStop(0.045, 5);
-      spawnImpactParticles(state.barrier.x + state.barrier.w * 0.5, state.barrier.y + 26, "#ff9f68", 12, 1.1);
-      showMessage("Barrier burned away");
+      spawnImpactParticles(state.barrier.x + state.barrier.w * 0.5, state.barrier.y + 26, barrierReaction.color ?? "#ff9f68", 12, 1.1);
+      announceProgressionRoute(state, true);
+      saveProgress();
+      showMessage(barrierReaction.message ?? "Barrier burned away");
+    } else if (barrierReaction.message) {
+      showMessage(barrierReaction.message);
     } else {
       showMessage(state.barrier.failureMessage);
+    }
+  }
+
+  if (state.gate.active && overlapsHitbox(attackBox, state.gate)) {
+    triggerReactiveObject(state.gate, {
+      type: "attack",
+      actor: state.player,
+      element: attackHitbox.element
+    });
+    if (!meetsRequirements(state.gate.requirements, state)) {
+      showMessage(state.gate.failureMessage);
+    }
+  }
+
+  for (const puzzle of state.puzzles ?? []) {
+    for (const node of puzzle.nodes ?? []) {
+      if (node.triggerType !== "attack") {
+        continue;
+      }
+      if (!aabbOverlap(attackHitbox, {
+        x: node.x - node.radius,
+        y: node.y - node.radius,
+        w: node.radius * 2,
+        h: node.radius * 2
+      })) {
+        continue;
+      }
+      const result = triggerPuzzleNode(puzzle, node.id, "attack", {
+        world: state.world,
+        element: attackHitbox.element
+      });
+      if (result.accepted) {
+        landedHit = true;
+        syncPuzzlePlatforms(state);
+        spawnImpactParticles(node.x, node.y, attackHitbox.element === "Fire" ? "#ffbf90" : "#f6efe0", 8, 0.7);
+        showMessage(result.solved ? `${puzzle.label} opens a spectral route` : `${node.label} ignites`, 2.2);
+      }
     }
   }
 
@@ -1889,6 +2785,19 @@ function overlapsHazard(entity, hazard) {
 function applyHitStop(duration, shakeStrength = 0) {
   state.combat.hitStop = Math.max(state.combat.hitStop, duration);
   applyScreenShake(duration * 8, shakeStrength);
+}
+
+function handleEnemyDefeat(enemy, reason = `${enemy.name} defeated`) {
+  enemy.alive = false;
+  if (enemy.boss) {
+    setProgressionFlag(state, "worldFlags", "bossDefeated", true);
+    regenerateProceduralLayout(state);
+    announceProgressionRoute(state, true);
+    saveProgress();
+  }
+  applyHitStop(0.07, 8);
+  spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.45, "#fff6dc", 12, 1.25);
+  showMessage(reason);
 }
 
 function applyScreenShake(duration, strength) {
@@ -2010,11 +2919,53 @@ function update(frame) {
 function updateSimulation(dt) {
   updatePlayer(dt);
   updateCurrentRoom(state, state.player);
+  updateEnvironmentElementState(state, dt);
+  updateEnvironmentReactivity(dt);
+  updatePuzzleSystems(dt);
   updateEnemies(dt);
   updateHazards();
   updateCheckpoints();
   updatePickups();
+  updateSecrets(dt);
   updateGate();
+  updateProgressionState();
+}
+
+function updateEnvironmentReactivity(dt) {
+  updateReactiveTimers(getReactiveObjects(state), dt);
+  state.environment.shadowRestEchoTimer = Math.max(0, state.environment.shadowRestEchoTimer - dt);
+
+  if (state.gate.active && Math.abs((state.player.x + state.player.w * 0.5) - (state.gate.x + state.gate.w * 0.5)) < 84) {
+    triggerReactiveObject(state.gate, {
+      type: "approach",
+      actor: state.player
+    });
+  }
+
+  for (const cache of state.secretCaches ?? []) {
+    if (!cache.active) {
+      continue;
+    }
+    if (overlapsTrigger(state.player, cache)) {
+      triggerReactiveObject(cache, {
+        type: "approach",
+        actor: state.player
+      });
+    }
+    const shadowRevealed = getReactiveFlag(cache, "shadowRevealed");
+    cache.revealAlpha = shadowRevealed && state.world === "Shadow" ? 1 : 0.5;
+  }
+
+  if (state.environment.shadowRestEchoTimer > 0) {
+    state.player.pogoGraceTimer = Math.max(state.player.pogoGraceTimer, 0.03);
+  }
+}
+
+function updatePuzzleSystems(dt) {
+  for (const puzzle of state.puzzles ?? []) {
+    updatePuzzleState(puzzle, dt);
+  }
+  syncPuzzlePlatforms(state);
 }
 
 function updatePlayer(dt) {
@@ -2088,6 +3039,7 @@ function updatePlayer(dt) {
 
   if (hasBossAlive() && player.x > 3440 && !state.bossIntroShown) {
     state.bossIntroShown = true;
+    setProgressionFlag(state, "worldFlags", "bossAwakened", true);
     showMessage("The Eclipse Lord awakens");
   }
 
@@ -2255,15 +3207,24 @@ function updateHazards() {
       continue;
     }
 
-    state.player.hp = Math.max(0, state.player.hp - (hazard.damage ?? 1));
+    if (!isWorldEntityActive(hazard, state.world)) {
+      continue;
+    }
+
+    const contactProfile = getHazardContactProfile(hazard, state.element);
+    if (!contactProfile.active) {
+      continue;
+    }
+
+    state.player.hp = Math.max(0, state.player.hp - contactProfile.damage);
     state.player.invuln = 0.55;
     state.player.hurtFlash = 0.28;
     state.player.vy = -210;
-    state.player.vx = state.player.facing >= 0 ? -220 : 220;
+    state.player.vx = (state.player.facing >= 0 ? -220 : 220) * contactProfile.knockbackMultiplier;
     playHitSound();
     applyHitStop(0.04, 5);
     spawnImpactParticles(state.player.x + state.player.w * 0.5, state.player.y + state.player.h * 0.8, "#dff3ff", 8, 0.9);
-    showMessage("The ice tore through you");
+    showMessage(contactProfile.message);
     if (state.player.hp <= 0) {
       handleDeath("You Died", "The cold ruins claimed you");
     }
@@ -2288,6 +3249,18 @@ function updateEnemies(dt) {
     enemy.stateTimer -= dt;
     enemy.contactCooldown -= dt;
     enemy.reactionTimer -= dt;
+    const elementalTick = updateEnemyElementalState(enemy, dt);
+    if (elementalTick.damage > 0) {
+      enemy.hp = Math.max(0, enemy.hp - elementalTick.damage);
+      enemy.hurtTimer = Math.max(enemy.hurtTimer, 0.12);
+      enemy.reactionTimer = Math.max(enemy.reactionTimer, 0.12);
+      enemy.reactionType = "elemental";
+      spawnImpactParticles(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.45, "#ffbf90", 4, 0.45);
+      if (enemy.hp <= 0) {
+        handleEnemyDefeat(enemy, `${enemy.name} burned away`);
+        continue;
+      }
+    }
     enemy.aiStateMachine.update(dt);
     if (enemy.reactionTimer <= 0) {
       enemy.reactionType = "none";
@@ -2300,17 +3273,29 @@ function updateEnemies(dt) {
         continue;
       }
       const damage = enemy.contactDamage ?? 1;
-      state.player.hp = Math.max(0, state.player.hp - damage);
+      const contactDamage = Math.max(1, Math.round(damage + (enemy.worldPhase?.contactDamageBonus ?? 0)));
+      state.player.hp = Math.max(0, state.player.hp - contactDamage);
       state.player.invuln = 0.55;
       state.player.hurtFlash = 0.28;
-      const knockback = enemy.type === "demon" ? 320 : enemy.type === "watcher" ? 210 : 240;
+      const knockback = enemy.type === "demon"
+        ? 320
+        : enemy.type === "watcher"
+          ? 210
+          : enemy.type === "hound"
+            ? 270
+            : enemy.type === "bulwark"
+              ? 340
+              : 240;
       state.player.vx = state.player.x + state.player.w * 0.5 < enemy.x + enemy.w * 0.5 ? -knockback : knockback;
-      state.player.vy = enemy.type === "watcher" ? -120 : -180;
+      state.player.vy = enemy.type === "watcher" ? -120 : enemy.type === "bulwark" ? -210 : -180;
       enemy.contactCooldown = getEnemyContactCooldown(enemy);
       playHitSound();
-      applyHitStop(enemy.type === "demon" ? 0.055 : 0.04, enemy.type === "demon" ? 9 : 7);
+      applyHitStop(
+        enemy.type === "demon" || enemy.type === "bulwark" ? 0.055 : 0.04,
+        enemy.type === "demon" || enemy.type === "bulwark" ? 9 : 7
+      );
       spawnImpactParticles(state.player.x + state.player.w * 0.5, state.player.y + state.player.h * 0.4, "#ffffff", 8, 0.9);
-      showMessage(`${enemy.name} struck you${damage > 1 ? ` for ${damage}` : ""}`);
+      showMessage(`${enemy.name} struck you${contactDamage > 1 ? ` for ${contactDamage}` : ""}`);
       if (state.player.hp <= 0) {
         handleDeath("You Died", "The shadows overwhelmed you");
         return;
@@ -2339,18 +3324,20 @@ function updateEnemyBehavior(enemy, dt) {
   const enemyCenterX = enemy.x + enemy.w * 0.5;
   const horizontalDistance = Math.abs(playerCenterX - enemyCenterX);
   const facingToPlayer = Math.sign(playerCenterX - enemyCenterX) || enemy.patrolDirection || 1;
+  const elementSpeedMultiplier = getEnemyElementSpeedMultiplier(enemy);
 
   if (enemy.type === "oracle") {
-    updateOracleBehavior(enemy, dt, horizontalDistance, facingToPlayer);
+    updateOracleBehavior(enemy, dt, horizontalDistance, facingToPlayer, elementSpeedMultiplier);
     return;
   }
 
   if (enemy.type === "revenant") {
-    updateRevenantBehavior(enemy, dt, horizontalDistance, facingToPlayer);
+    updateRevenantBehavior(enemy, dt, horizontalDistance, facingToPlayer, elementSpeedMultiplier);
     return;
   }
 
   const currentState = getEnemyState(enemy);
+  const worldSpeedMultiplier = enemy.worldPhase?.speedMultiplier ?? 1;
 
   if (currentState === "idle") {
     brakeEnemy(enemy, dt, 1.15);
@@ -2415,6 +3402,31 @@ function updateEnemyBehavior(enemy, dt) {
   }
 
   if (currentState === "patrol") {
+    if (enemy.type === "hound" && horizontalDistance < 260 && enemy.actionCooldown <= 0) {
+      beginEnemyWindup(enemy, 0.14, facingToPlayer, {
+        type: "burst",
+        burstTime: 0.24,
+        speed: 335,
+        cooldown: 0.95,
+        recoveryTime: 0.16
+      });
+      return;
+    }
+
+    if (enemy.type === "bulwark") {
+      enemy.guardFacing = facingToPlayer;
+      if (horizontalDistance < 210 && enemy.actionCooldown <= 0) {
+        beginEnemyWindup(enemy, 0.32, facingToPlayer, {
+          type: "burst",
+          burstTime: 0.3,
+          speed: 225,
+          cooldown: 1.55,
+          recoveryTime: 0.28
+        });
+        return;
+      }
+    }
+
     if (enemy.type === "goblin" && horizontalDistance < 170 && enemy.actionCooldown <= 0) {
       beginEnemyWindup(enemy, 0.16, facingToPlayer, {
         type: "burst",
@@ -2461,9 +3473,13 @@ function updateEnemyBehavior(enemy, dt) {
       return;
     }
 
-    moveEnemyInCurrentDirection(enemy, dt);
+    moveEnemyInCurrentDirection(enemy, dt, getEnemyPatrolSpeed(enemy) * elementSpeedMultiplier * worldSpeedMultiplier);
     if (enemy.type === "shadowWalker") {
       tryEnemyPatrolTurn(enemy, 0.18);
+    } else if (enemy.type === "hound") {
+      tryEnemyPatrolTurn(enemy, 0.08);
+    } else if (enemy.type === "bulwark") {
+      tryEnemyPatrolTurn(enemy, 0.34);
     } else if (enemy.type === "demon") {
       tryEnemyPatrolTurn(enemy, 0.28);
     } else {
@@ -2472,7 +3488,7 @@ function updateEnemyBehavior(enemy, dt) {
   }
 }
 
-function updateOracleBehavior(enemy, dt, horizontalDistance, facingToPlayer) {
+function updateOracleBehavior(enemy, dt, horizontalDistance, facingToPlayer, elementSpeedMultiplier = 1) {
   const controller = enemy.bossController;
   const currentState = getEnemyState(enemy);
   const phaseResult = resolveBossPhase(enemy, controller);
@@ -2589,8 +3605,8 @@ function updateOracleBehavior(enemy, dt, horizontalDistance, facingToPlayer) {
     enemy,
     dt,
     controller.phase === "phase-2"
-      ? enemy.baseSpeed + Math.sin(performance.now() * 0.007 + enemy.x * 0.012) * 14
-      : enemy.baseSpeed
+      ? (enemy.baseSpeed + Math.sin(performance.now() * 0.007 + enemy.x * 0.012) * 14) * elementSpeedMultiplier
+      : enemy.baseSpeed * elementSpeedMultiplier
   );
   tryEnemyPatrolTurn(enemy);
 }
@@ -2600,7 +3616,7 @@ function queueBossAttack(enemy, direction, attackConfig) {
   beginEnemyWindup(enemy, attackConfig.windup, enemy.patrolDirection, attackConfig.action);
 }
 
-function updateRevenantBehavior(enemy, dt, horizontalDistance, facingToPlayer) {
+function updateRevenantBehavior(enemy, dt, horizontalDistance, facingToPlayer, elementSpeedMultiplier = 1) {
   const arenaWakeX = 3000;
   const currentState = getEnemyState(enemy);
 
@@ -2687,7 +3703,7 @@ function updateRevenantBehavior(enemy, dt, horizontalDistance, facingToPlayer) {
   moveEnemyInCurrentDirection(
     enemy,
     dt,
-    enemy.baseSpeed + Math.sin(performance.now() * 0.006 + enemy.x * 0.01) * 12
+    (enemy.baseSpeed + Math.sin(performance.now() * 0.006 + enemy.x * 0.01) * 12) * elementSpeedMultiplier
   );
   tryEnemyPatrolTurn(enemy);
 }
@@ -2711,7 +3727,13 @@ function getEnemyPatrolSpeed(enemy) {
   if (enemy.type === "goblin") {
     return enemy.baseSpeed + Math.sin(performance.now() * 0.012 + enemy.x * 0.03) * 16;
   }
+  if (enemy.type === "hound") {
+    return enemy.baseSpeed + Math.sin(performance.now() * 0.016 + enemy.x * 0.03) * 18;
+  }
   if (enemy.type === "shadowWalker") {
+    return enemy.baseSpeed;
+  }
+  if (enemy.type === "bulwark") {
     return enemy.baseSpeed;
   }
   if (enemy.type === "demon") {
@@ -2733,8 +3755,14 @@ function getEnemyContactCooldown(enemy) {
   if (enemy.type === "goblin") {
     return 0.28;
   }
+  if (enemy.type === "hound") {
+    return 0.36;
+  }
   if (enemy.type === "shadowWalker") {
     return 0.5;
+  }
+  if (enemy.type === "bulwark") {
+    return 0.78;
   }
   if (enemy.type === "demon") {
     return 0.72;
@@ -2775,6 +3803,8 @@ function updatePickups() {
     if (entity.components.reward === "Dash") {
       pickup.active = false;
       state.abilityUnlocked.Dash = true;
+      regenerateProceduralLayout(state);
+      announceProgressionRoute(state, true);
       saveProgress();
       showMessage("Dash unlocked");
       continue;
@@ -2783,9 +3813,47 @@ function updatePickups() {
     if (entity.components.reward === "WeaponStage") {
       pickup.active = false;
       player.weaponStage = 1;
+      regenerateProceduralLayout(state);
+      announceProgressionRoute(state, true);
       saveProgress();
       showMessage("Weapon evolved to Stage II");
     }
+  }
+}
+
+function updateSecrets(dt) {
+  const player = state.player;
+
+  for (const entity of state.entities.getByType("secret")) {
+    const cache = entity.source;
+    cache.feedbackTimer = Math.max(0, (cache.feedbackTimer ?? 0) - dt);
+    if (!cache.active || !overlapsTrigger(player, cache)) {
+      continue;
+    }
+
+    if (!meetsRequirements(cache.requirements, state)) {
+      if (cache.feedbackTimer <= 0) {
+        cache.feedbackTimer = 0.9;
+        showMessage(cache.failureMessage ?? "This reliquary remains sealed");
+      }
+      continue;
+    }
+
+    cache.active = false;
+    setProgressionFlag(state, "optionalSecrets", cache.reward.secretId, true);
+    if (cache.reward.keyItem) {
+      setProgressionFlag(state, "keyItems", cache.reward.keyItem, true);
+    }
+    if (cache.reward.type === "maxHp") {
+      state.player.maxHp += cache.reward.amount ?? 1;
+      state.player.hp = Math.min(state.player.maxHp, state.player.hp + (cache.reward.amount ?? 1));
+      state.player.displayHp = state.player.hp;
+    }
+    spawnImpactParticles(cache.x + cache.w * 0.5, cache.y + cache.h * 0.5, "#fff0c2", 14, 0.9);
+    regenerateProceduralLayout(state);
+    announceProgressionRoute(state, true);
+    saveProgress();
+    showMessage("The reliquary yields a Moon Seal and deeper vitality", 3.2);
   }
 }
 
@@ -2804,6 +3872,13 @@ function updateGate() {
   state.gate.active = !meetsRequirements(state.gate.requirements, state);
 }
 
+function updateProgressionState() {
+  setProgressionFlag(state, "worldFlags", "gateOpened", !state.gate.active);
+  setProgressionFlag(state, "worldFlags", "barrierCleared", !state.barrier.active);
+  setProgressionFlag(state, "worldFlags", "bossAwakened", state.bossIntroShown);
+  setProgressionFlag(state, "worldFlags", "bossDefeated", !hasBossAlive());
+}
+
 function updateCamera(dt) {
   const targetX = clamp(state.player.x - canvas.width * 0.35, 0, state.worldWidth - canvas.width);
   state.camera.x += (targetX - state.camera.x) * Math.min(1, dt / state.camera.smooth);
@@ -2811,6 +3886,8 @@ function updateCamera(dt) {
 
 function updateHud() {
   const currentRoom = getCurrentRoom(state);
+  const currentRoute = getCurrentProgressionRoute(state);
+  const optionalRoute = getAvailableOptionalRoutes(state)[0] ?? null;
   hud.health.textContent = `${state.player.hp} / ${state.player.maxHp}`;
   const hpPercent = clamp(state.player.hp / state.player.maxHp, 0, 1) * 100;
   const displayPercent = clamp(state.player.displayHp / state.player.maxHp, 0, 1) * 100;
@@ -2830,16 +3907,14 @@ function updateHud() {
   } else if (state.nearbyCheckpointId) {
     const checkpoint = getCheckpointById(state, state.nearbyCheckpointId);
     hud.objective.textContent = `Press R to rest at ${checkpoint.label}`;
-  } else if (state.pickups.dash.active) {
-    hud.objective.textContent = "Reach the Dash Core";
-  } else if (state.gate.active) {
-    hud.objective.textContent = "The path is sealed";
-  } else if (state.barrier.active) {
-    hud.objective.textContent = "Use Fire and attack the barrier";
-  } else if (state.pickups.weapon.active) {
-    hud.objective.textContent = "Claim the weapon upgrade";
+  } else if (currentRoute) {
+    hud.objective.textContent = currentRoute.roomId === currentRoom.id
+      ? currentRoute.objective
+      : `${currentRoute.objective} (${getRoomById(state, currentRoute.roomId).label})`;
+  } else if (optionalRoute) {
+    hud.objective.textContent = `${optionalRoute.objective} (Optional)`;
   } else {
-    hud.objective.textContent = currentRoom.objectiveHint ?? "Reach the exit chamber";
+    hud.objective.textContent = getRoomProgressionHint(state, currentRoom);
   }
 }
 
@@ -2854,6 +3929,7 @@ function draw() {
   drawRoomMarkers();
   drawFarStructures();
   drawPlatforms();
+  drawPuzzlePlatforms();
   drawRoomDecor();
   drawCheckpoints();
   drawShadowPlatforms();
@@ -2861,6 +3937,7 @@ function draw() {
   drawGate();
   drawHazards();
   drawPickups();
+  drawSecretCaches();
   drawSlashEffects();
   drawEnemies();
   drawExit();
@@ -2875,6 +3952,12 @@ function draw() {
   }
   if (state.debug.showSaveState) {
     drawSaveDebugOverlay();
+  }
+  if (state.debug.showProceduralLayout) {
+    drawProceduralLayoutOverlay();
+  }
+  if (state.puzzleState.debugVisible) {
+    drawPuzzleOverlay();
   }
   ctx.restore();
   drawDebugStateOverlay();
@@ -2909,12 +3992,30 @@ function drawRequirementDebugOverlay() {
   const labels = [];
   const currentRoom = getCurrentRoom(state);
   const roomEntities = getRoomEntities(state, currentRoom.id);
+  const activeRoute = getCurrentProgressionRoute(state);
+  const optionalRoute = getAvailableOptionalRoutes(state)[0] ?? null;
 
   labels.push({
     x: state.camera.x + 18,
     y: 20,
-    text: `Room: ${currentRoom.label} | pickups ${roomEntities.pickups.length} | checkpoints ${roomEntities.checkpoints.length}`
+    text: `Room: ${currentRoom.label} | pickups ${roomEntities.pickups.length} | checkpoints ${roomEntities.checkpoints.length} | secrets ${roomEntities.secrets.length}`
   });
+
+  if (activeRoute) {
+    labels.push({
+      x: state.camera.x + 18,
+      y: 42,
+      text: `Main route: ${activeRoute.objective}`
+    });
+  }
+
+  if (optionalRoute) {
+    labels.push({
+      x: state.camera.x + 18,
+      y: 64,
+      text: `Optional: ${optionalRoute.objective}`
+    });
+  }
 
   if (state.gate.active) {
     labels.push({
@@ -2929,6 +4030,17 @@ function drawRequirementDebugOverlay() {
       x: state.barrier.x - 10,
       y: state.barrier.y - 14,
       text: `Barrier: ${formatRequirements(state.barrier.requirements)}`
+    });
+  }
+
+  for (const cache of state.secretCaches ?? []) {
+    if (!cache.active) {
+      continue;
+    }
+    labels.push({
+      x: cache.x - 12,
+      y: cache.y - 14,
+      text: `${cache.label}: ${formatRequirements(cache.requirements)}`
     });
   }
 
@@ -2947,39 +4059,132 @@ function formatRequirements(requirements) {
   if (!requirements) {
     return "none";
   }
+  const parts = [];
   if (requirements.abilities?.length) {
-    return requirements.abilities.join(" + ");
+    parts.push(requirements.abilities.join(" + "));
   }
   if (requirements.element) {
-    return requirements.element;
+    parts.push(requirements.element);
   }
   if (requirements.world) {
-    return requirements.world;
+    parts.push(requirements.world);
+  }
+  if (requirements.minWeaponStage != null) {
+    parts.push(`Weapon ${requirements.minWeaponStage}+`);
+  }
+  if (requirements.keyItems?.length) {
+    parts.push(requirements.keyItems.join(" + "));
+  }
+  if (requirements.worldFlags?.length) {
+    parts.push(requirements.worldFlags.join(" + "));
+  }
+  if (requirements.secrets?.length) {
+    parts.push(requirements.secrets.join(" + "));
+  }
+  if (requirements.visitedRooms?.length) {
+    parts.push(`Visited ${requirements.visitedRooms.join("/")}`);
   }
   if (requirements.anyOf?.length) {
-    return requirements.anyOf.map(formatRequirements).join(" or ");
+    parts.push(requirements.anyOf.map(formatRequirements).join(" or "));
   }
-  return "custom";
+  return parts.join(" | ") || "custom";
 }
 
 function drawSaveDebugOverlay() {
   const payload = getSavePayload(state);
+  const progression = getProgressionState(state);
   const lines = [
     `Save v${payload.version}`,
     `Checkpoint: ${payload.checkpoint.id} (${payload.checkpoint.roomId})`,
     `Dash: ${payload.progression.abilities.Dash ? "yes" : "no"}`,
     `Weapon: ${payload.upgrades.weaponStage}`,
+    `Moon Seal: ${progression.keyItems.MoonSeal ? "owned" : "missing"}`,
+    `Barrier: ${progression.worldFlags.barrierCleared ? "cleared" : "sealed"}`,
     `Dash pickup: ${payload.roomFlags.pickups.dashCollected ? "taken" : "up"}`,
-    `Weapon pickup: ${payload.roomFlags.pickups.weaponCollected ? "taken" : "up"}`
+    `Weapon pickup: ${payload.roomFlags.pickups.weaponCollected ? "taken" : "up"}`,
+    `Reliquary: ${progression.optionalSecrets.rampartReliquary ? "opened" : "hidden"}`
   ];
 
   ctx.save();
   ctx.fillStyle = "rgba(10, 14, 24, 0.84)";
-  ctx.fillRect(22, 112, 248, 18 + lines.length * 18);
+  ctx.fillRect(22, 112, 272, 18 + lines.length * 18);
   ctx.fillStyle = "#dfe7ff";
   ctx.font = "12px monospace";
   lines.forEach((line, index) => {
     ctx.fillText(line, 32, 130 + index * 18);
+  });
+  ctx.restore();
+}
+
+function drawProceduralLayoutOverlay() {
+  const generated = state.proceduralLayout;
+  const lines = [
+    `Challenge route seed: ${generated.seed}`,
+    `Valid: ${generated.validation.valid ? "yes" : "no"}`
+  ];
+
+  generated.route.forEach((entry, index) => {
+    lines.push(`${index + 1}. ${entry.label} [${entry.role}]`);
+  });
+
+  if (generated.validation.errors.length) {
+    lines.push(`Issue: ${generated.validation.errors[0]}`);
+  } else {
+    lines.push("Press L again to reroll this route.");
+  }
+
+  const width = 340;
+  const lineHeight = 18;
+  const x = state.camera.x + canvas.width - width - 22;
+  const y = 22;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(9, 13, 22, 0.86)";
+  ctx.fillRect(x, y, width, 18 + lines.length * lineHeight);
+  ctx.fillStyle = "#d7e5ff";
+  ctx.font = "12px monospace";
+  lines.forEach((line, index) => {
+    ctx.fillStyle = index < 2 ? "#f2ebd0" : "#d7e5ff";
+    ctx.fillText(line, x + 10, y + 18 + index * lineHeight);
+  });
+  ctx.restore();
+}
+
+function drawPuzzleOverlay() {
+  const lines = [];
+  for (const puzzle of state.puzzles ?? []) {
+    lines.push(`${puzzle.label}: ${isPuzzleActive(puzzle) ? "active" : "idle"} ${puzzle.runtime?.activeWindowTimer ? `(${puzzle.runtime.activeWindowTimer.toFixed(1)}s)` : ""}`.trim());
+    for (const node of puzzle.nodes ?? []) {
+      const nodeState = getPuzzleNodeState(puzzle, node.id);
+      lines.push(`- ${node.label}: ${nodeState.active ? nodeState.timer.toFixed(1) : "off"}`);
+    }
+  }
+
+  for (const puzzle of state.puzzles ?? []) {
+    for (const node of puzzle.nodes ?? []) {
+      const nodeState = getPuzzleNodeState(puzzle, node.id);
+      ctx.save();
+      ctx.strokeStyle = nodeState.active ? "#fff0b8" : "rgba(191, 206, 255, 0.45)";
+      ctx.lineWidth = nodeState.active ? 3 : 2;
+      ctx.beginPath();
+      ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "rgba(10, 14, 24, 0.84)";
+      ctx.fillRect(node.x - 40, node.y - node.radius - 18, 92, 16);
+      ctx.fillStyle = "#f4ebc9";
+      ctx.font = "11px monospace";
+      ctx.fillText(node.label, node.x - 34, node.y - node.radius - 6);
+      ctx.restore();
+    }
+  }
+
+  ctx.save();
+  ctx.fillStyle = "rgba(10, 14, 24, 0.84)";
+  ctx.fillRect(22, 286, 280, 18 + lines.length * 18);
+  ctx.fillStyle = "#dfe7ff";
+  ctx.font = "12px monospace";
+  lines.forEach((line, index) => {
+    ctx.fillText(line, 32, 304 + index * 18);
   });
   ctx.restore();
 }
@@ -2997,7 +4202,13 @@ function drawDebugStateOverlay() {
     if (!enemy.alive) {
       continue;
     }
-    debugLines.push(`${enemy.name}: ${getEnemyState(enemy)} (${Math.max(0, enemy.stateTimer).toFixed(2)}s)`);
+    const elementState = enemy.elementalState?.type && enemy.elementalState.type !== "none"
+      ? ` | ${enemy.elementalState.type} ${Math.max(0, enemy.elementalState.timer).toFixed(1)}s`
+      : "";
+    const worldPhase = enemy.worldPhase?.phase && enemy.worldPhase.phase !== "neutral"
+      ? ` | ${enemy.worldPhase.phase}`
+      : "";
+    debugLines.push(`${enemy.name}: ${getEnemyState(enemy)} (${Math.max(0, enemy.stateTimer).toFixed(2)}s)${worldPhase}${elementState}`);
   }
 
   ctx.save();
@@ -3062,10 +4273,17 @@ function drawPlatforms() {
   }
 }
 
+function drawPuzzlePlatforms() {
+  for (const platform of state.puzzlePlatforms ?? []) {
+    const skin = getRoomVisualTheme(platform.x + platform.w * 0.5);
+    drawSpectralPlatform(platform, skin, platform.active && isWorldEntityActive(platform, state.world));
+  }
+}
+
 function drawShadowPlatforms() {
   for (const platform of state.shadowPlatforms) {
     const skin = getRoomVisualTheme(platform.x + platform.w * 0.5);
-    if (state.world === platform.world) {
+    if (isWorldEntityActive(platform, state.world)) {
       drawSpectralPlatform(platform, skin, true);
     } else {
       drawSpectralPlatform(platform, skin, false);
@@ -3092,11 +4310,13 @@ function drawBarrier() {
   const w = state.barrier.w;
   const h = state.barrier.h;
   const heat = state.element === "Fire";
+  const swapPulse = getReactivePulse(state.barrier, "swap");
+  const attackPulse = getReactivePulse(state.barrier, "attack");
   const base = heat ? COLORS.burnableHot : COLORS.burnable;
 
   ctx.save();
   const glow = ctx.createRadialGradient(x + w * 0.5, y + h * 0.35, 6, x + w * 0.5, y + h * 0.45, 54);
-  glow.addColorStop(0, hexToRgba(heat ? "#ffb47d" : "#8c5a3b", heat ? 0.32 : 0.18));
+  glow.addColorStop(0, hexToRgba(heat ? "#ffb47d" : swapPulse > 0 ? "#b0bcff" : "#8c5a3b", heat ? 0.32 : swapPulse > 0 ? 0.26 : 0.18));
   glow.addColorStop(1, hexToRgba(heat ? "#ff9a63" : "#5f3722", 0));
   ctx.fillStyle = glow;
   ctx.fillRect(x - 28, y - 18, w + 56, h + 42);
@@ -3123,8 +4343,8 @@ function drawBarrier() {
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(34, 14, 8, 0.82)";
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = attackPulse > 0 ? "rgba(255, 240, 210, 0.92)" : "rgba(34, 14, 8, 0.82)";
+  ctx.lineWidth = attackPulse > 0 ? 2.8 : 2;
   ctx.stroke();
 
   ctx.strokeStyle = hexToRgba(heat ? "#ffd3a4" : "#d4976c", 0.34);
@@ -3166,6 +4386,15 @@ function drawPickups() {
   }
 }
 
+function drawSecretCaches() {
+  for (const cache of state.secretCaches ?? []) {
+    if (!cache.active) {
+      continue;
+    }
+    drawPickupRelic(cache, "secret");
+  }
+}
+
 function drawCheckpoints() {
   for (const checkpoint of state.checkpoints) {
     const active = checkpoint.id === state.savedCheckpointId;
@@ -3200,6 +4429,7 @@ function drawEnemies() {
       telegraphAlpha: anticipationStrength,
       actionAlpha: actionStrength,
       reactionAlpha: reactionStrength,
+      worldPhaseAlpha: enemy.worldPhase?.phase === "empowered" ? 0.26 : enemy.worldPhase?.phase === "exposed" ? 0.3 : 0,
       renderState: enemyState
     };
 
@@ -3250,6 +4480,10 @@ function getEnemyStateDurationGuess(enemy) {
   switch (enemy.type) {
     case "demon":
       return 0.42;
+    case "bulwark":
+      return 0.32;
+    case "hound":
+      return 0.14;
     case "shadowWalker":
       return 0.28;
     case "watcher":
@@ -3267,6 +4501,10 @@ function getEnemyAnticipationLean(enemy) {
   switch (enemy.type) {
     case "demon":
       return 10;
+    case "bulwark":
+      return 12;
+    case "hound":
+      return 7;
     case "shadowWalker":
       return 8;
     case "oracle":
@@ -3300,6 +4538,33 @@ function getEnemyReactionOffset(enemy, strength) {
 }
 
 function drawEnemyTelegraph(enemy) {
+  if (enemy.worldPhaseAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = enemy.worldPhaseAlpha;
+    ctx.strokeStyle = enemy.worldPhase?.phase === "empowered"
+      ? (enemy.worldPhase.affinity === "Shadow" ? "rgba(155, 168, 255, 0.92)" : "rgba(252, 239, 190, 0.9)")
+      : "rgba(255, 231, 193, 0.92)";
+    ctx.lineWidth = enemy.boss ? 4 : 3;
+    ctx.beginPath();
+    ctx.ellipse(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.48, enemy.w * 0.86, enemy.h * 0.8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  if (enemy.elementalState?.type && enemy.elementalState.type !== "none") {
+    ctx.save();
+    ctx.globalAlpha = 0.2 + Math.sin(performance.now() * 0.01 + enemy.x * 0.02) * 0.06;
+    ctx.fillStyle = enemy.elementalState.type === "scorch"
+      ? "rgba(255, 165, 112, 0.85)"
+      : enemy.elementalState.type === "chill"
+        ? "rgba(187, 235, 255, 0.82)"
+        : "rgba(214, 255, 239, 0.78)";
+    ctx.beginPath();
+    ctx.ellipse(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.48, enemy.w * 0.82, enemy.h * 0.76, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   if (enemy.telegraphAlpha > 0) {
     const pulse = 0.35 + Math.sin(performance.now() * 0.02 + enemy.x * 0.02) * 0.18;
     const telegraphColor = getEnemyTelegraphColor(enemy.type);
@@ -3349,10 +4614,14 @@ function getEnemyTelegraphColor(type) {
   switch (type) {
     case "goblin":
       return "rgba(255, 238, 170, 0.92)";
+    case "hound":
+      return "rgba(255, 180, 145, 0.94)";
     case "shadowWalker":
       return "rgba(174, 174, 255, 0.95)";
     case "demon":
       return "rgba(255, 144, 116, 0.94)";
+    case "bulwark":
+      return "rgba(246, 230, 181, 0.95)";
     case "watcher":
       return "rgba(176, 238, 255, 0.96)";
     case "oracle":
@@ -3878,6 +5147,10 @@ function drawEnemySilhouette(enemy, baseColor, facing) {
     drawGoblin(enemy, baseColor, facing);
     return;
   }
+  if (enemy.type === "hound") {
+    drawHound(enemy, baseColor, facing);
+    return;
+  }
   if (enemy.type === "shadowWalker") {
     drawShadowWalker(enemy, baseColor, facing);
     return;
@@ -3895,6 +5168,55 @@ function drawEnemySilhouette(enemy, baseColor, facing) {
     return;
   }
   drawDemon(enemy, baseColor, facing);
+}
+
+function drawHound(enemy, color, facing) {
+  const x = enemy.x;
+  const y = enemy.y;
+  const lunge = enemy.renderState === "burst" ? 6 : enemy.telegraphAlpha * 4;
+  drawOvalShadow(x + 20, y + enemy.h + 4, 20, 6, "rgba(0,0,0,0.2)");
+  ctx.save();
+  ctx.translate(x + enemy.w / 2, y);
+  ctx.scale(facing, 1);
+  ctx.translate(-(x + enemy.w / 2), -y);
+  ctx.translate(lunge, 0);
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x + 6, y + 26);
+  ctx.lineTo(x + 14, y + 12);
+  ctx.lineTo(x + 28, y + 10);
+  ctx.lineTo(x + 38, y + 18);
+  ctx.lineTo(x + 34, y + 30);
+  ctx.lineTo(x + 18, y + 34);
+  ctx.lineTo(x + 8, y + 32);
+  ctx.closePath();
+  ctx.fill();
+  strokeBlobOutline(() => {
+    ctx.beginPath();
+    ctx.moveTo(x + 6, y + 26);
+    ctx.lineTo(x + 14, y + 12);
+    ctx.lineTo(x + 28, y + 10);
+    ctx.lineTo(x + 38, y + 18);
+    ctx.lineTo(x + 34, y + 30);
+    ctx.lineTo(x + 18, y + 34);
+    ctx.lineTo(x + 8, y + 32);
+    ctx.closePath();
+  });
+
+  ctx.fillStyle = "#ffe4d8";
+  ctx.fillRect(x + 24, y + 15, 3, 2);
+  ctx.fillRect(x + 30, y + 15, 3, 2);
+  ctx.fillStyle = "#1a1110";
+  ctx.fillRect(x + 8, y + 31, 5, 12);
+  ctx.fillRect(x + 17, y + 32, 5, 11);
+  ctx.fillRect(x + 27, y + 31, 5, 12);
+  ctx.strokeStyle = "rgba(255, 196, 176, 0.4)";
+  ctx.beginPath();
+  ctx.moveTo(x + 4, y + 24);
+  ctx.quadraticCurveTo(x - 6, y + 14, x + 2, y + 10);
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawGoblin(enemy, color, facing) {
@@ -4041,6 +5363,9 @@ function getEnemyColor(type) {
   if (type === "goblin") {
     return COLORS.goblin;
   }
+  if (type === "hound") {
+    return COLORS.hound;
+  }
   if (type === "shadowWalker") {
     return COLORS.shadowWalker;
   }
@@ -4052,6 +5377,9 @@ function getEnemyColor(type) {
   }
   if (type === "revenant") {
     return "#d5ecff";
+  }
+  if (type === "bulwark") {
+    return COLORS.bulwark;
   }
   return COLORS.demon;
 }
@@ -4405,15 +5733,20 @@ function drawSpectralPlatform(platform, skin, active) {
 function drawHazardBed(hazard) {
   const theme = getRoomVisualTheme(hazard.x + hazard.w * 0.5);
   const count = Math.max(2, Math.floor(hazard.w / 12));
+  const dampened = (hazard.dampenedTimer ?? 0) > 0;
+  const activeInWorld = isWorldEntityActive(hazard, state.world);
 
   ctx.save();
+  ctx.globalAlpha = activeInWorld ? 1 : 0.22;
   ctx.fillStyle = hexToRgba(theme.depth, 0.92);
   ctx.fillRect(hazard.x - 4, hazard.y + hazard.h - 4, hazard.w + 8, 8);
 
   for (let i = 0; i < count; i++) {
     const px = hazard.x + i * (hazard.w / count);
     const spikeWidth = hazard.w / count;
-    ctx.fillStyle = state.world === "Light" ? "rgba(224, 242, 255, 0.9)" : "rgba(161, 180, 255, 0.82)";
+    ctx.fillStyle = dampened
+      ? (state.world === "Light" ? "rgba(255, 220, 178, 0.8)" : "rgba(255, 191, 144, 0.72)")
+      : (state.world === "Light" ? "rgba(224, 242, 255, 0.9)" : "rgba(161, 180, 255, 0.82)");
     ctx.beginPath();
     ctx.moveTo(px, hazard.y + hazard.h);
     ctx.lineTo(px + spikeWidth * 0.18, hazard.y + hazard.h * 0.68);
@@ -4427,6 +5760,11 @@ function drawHazardBed(hazard) {
     ctx.lineWidth = 1;
     ctx.stroke();
   }
+
+  if (dampened) {
+    ctx.fillStyle = "rgba(255, 205, 148, 0.2)";
+    ctx.fillRect(hazard.x - 2, hazard.y - 8, hazard.w + 4, 8);
+  }
   ctx.restore();
 }
 
@@ -4436,6 +5774,9 @@ function drawDiegeticGate(gate, active) {
   const y = gate.y;
   const w = gate.w;
   const h = gate.h;
+  const approachPulse = getReactivePulse(gate, "approach");
+  const swapPulse = getReactivePulse(gate, "swap");
+  const attackPulse = getReactivePulse(gate, "attack");
 
   ctx.save();
   ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
@@ -4444,8 +5785,8 @@ function drawDiegeticGate(gate, active) {
   ctx.fillRect(x - 10, y - 10, w + 20, h + 12);
 
   const frameGradient = ctx.createLinearGradient(x, y, x + w, y + h);
-  frameGradient.addColorStop(0, active ? COLORS.gate : hexToRgba(COLORS.gateOpen, 0.4));
-  frameGradient.addColorStop(1, active ? theme.face : hexToRgba(COLORS.gateOpen, 0.18));
+  frameGradient.addColorStop(0, active ? (swapPulse > 0 ? "#9aa9f7" : COLORS.gate) : hexToRgba(COLORS.gateOpen, 0.4));
+  frameGradient.addColorStop(1, active ? (approachPulse > 0 ? "#d9c28e" : theme.face) : hexToRgba(COLORS.gateOpen, 0.18));
   ctx.fillStyle = frameGradient;
   roundRectPath(x, y, w, h, 8);
   ctx.fill();
@@ -4453,8 +5794,8 @@ function drawDiegeticGate(gate, active) {
   if (active) {
     ctx.fillStyle = hexToRgba(theme.trim, 0.15);
     ctx.fillRect(x + 5, y + 10, w - 10, h - 20);
-    ctx.strokeStyle = "rgba(235, 222, 184, 0.22)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = attackPulse > 0 ? "rgba(255, 244, 214, 0.82)" : "rgba(235, 222, 184, 0.22)";
+    ctx.lineWidth = attackPulse > 0 ? 2.8 : 2;
     ctx.strokeRect(x + 4, y + 6, w - 8, h - 12);
     ctx.fillStyle = COLORS.pickupDash;
     ctx.beginPath();
@@ -4477,9 +5818,9 @@ function drawDiegeticGate(gate, active) {
 function drawPickupRelic(pickup, kind) {
   const centerX = pickup.x + pickup.w * 0.5;
   const centerY = pickup.y + pickup.h * 0.5 + Math.sin(performance.now() * 0.004 + pickup.x * 0.03) * 3;
-  const color = kind === "dash" ? COLORS.pickupDash : COLORS.pickupWeapon;
+  const color = kind === "dash" ? COLORS.pickupDash : kind === "secret" ? "#f6efbe" : COLORS.pickupWeapon;
   const halo = ctx.createRadialGradient(centerX, centerY, 3, centerX, centerY, 36);
-  halo.addColorStop(0, hexToRgba(color, 0.42));
+  halo.addColorStop(0, hexToRgba(color, kind === "secret" ? (pickup.revealAlpha ?? 0.42) : 0.42));
   halo.addColorStop(1, hexToRgba(color, 0));
 
   ctx.save();
@@ -4504,7 +5845,7 @@ function drawPickupRelic(pickup, kind) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-  } else {
+  } else if (kind === "weapon") {
     ctx.fillStyle = hexToRgba(color, 0.95);
     ctx.beginPath();
     ctx.moveTo(centerX, centerY - 14);
@@ -4516,11 +5857,31 @@ function drawPickupRelic(pickup, kind) {
     ctx.stroke();
     ctx.fillStyle = "#f4fbff";
     ctx.fillRect(centerX - 1.5, centerY - 18, 3, 34);
+  } else {
+    ctx.fillStyle = hexToRgba(color, 0.95);
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - 14);
+    ctx.lineTo(centerX + 12, centerY - 2);
+    ctx.lineTo(centerX, centerY + 14);
+    ctx.lineTo(centerX - 12, centerY - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = "#fff8dc";
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY - 10);
+    ctx.lineTo(centerX, centerY + 10);
+    ctx.moveTo(centerX - 10, centerY);
+    ctx.lineTo(centerX + 10, centerY);
+    ctx.stroke();
   }
   ctx.restore();
 }
 
 function drawCheckpointShrine(checkpoint, active, nearby) {
+  const swapPulse = getReactivePulse(checkpoint, "swap");
+  const restPulse = getReactivePulse(checkpoint, "rest");
+  const shadowBlessing = getReactiveFlag(checkpoint, "shadowBlessing");
   const glowColor = active
     ? (state.world === "Light" ? "#f3dca3" : "#9ca8ff")
     : nearby ? "#e9d6aa" : "#c6d0e4";
@@ -4534,6 +5895,17 @@ function drawCheckpointShrine(checkpoint, active, nearby) {
   ctx.arc(checkpoint.x + 14, checkpoint.y + 18, active ? 46 : nearby ? 38 : 28, 0, Math.PI * 2);
   ctx.fill();
 
+  if (swapPulse > 0 || restPulse > 0 || shadowBlessing) {
+    ctx.fillStyle = shadowBlessing
+      ? "rgba(146, 166, 255, 0.22)"
+      : swapPulse > 0
+        ? "rgba(168, 188, 255, 0.18)"
+        : "rgba(255, 232, 190, 0.18)";
+    ctx.beginPath();
+    ctx.arc(checkpoint.x + 14, checkpoint.y + 18, 52, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.fillStyle = "rgba(18, 20, 30, 0.82)";
   ctx.beginPath();
   ctx.moveTo(checkpoint.x - 6, checkpoint.y + checkpoint.h);
@@ -4544,8 +5916,8 @@ function drawCheckpointShrine(checkpoint, active, nearby) {
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = active ? glowColor : nearby ? "#e9d6aa" : "rgba(180, 190, 215, 0.5)";
-  ctx.lineWidth = active ? 3 : nearby ? 2.5 : 2;
+  ctx.strokeStyle = shadowBlessing ? "#b8c7ff" : active ? glowColor : nearby ? "#e9d6aa" : "rgba(180, 190, 215, 0.5)";
+  ctx.lineWidth = shadowBlessing ? 3.2 : active ? 3 : nearby ? 2.5 : 2;
   ctx.beginPath();
   ctx.moveTo(checkpoint.x + 14, checkpoint.y - 4);
   ctx.lineTo(checkpoint.x + 14, checkpoint.y + checkpoint.h - 8);

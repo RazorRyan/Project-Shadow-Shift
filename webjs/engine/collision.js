@@ -1,5 +1,6 @@
 (function initializeShadowShiftCollision(global) {
   const EPSILON = 0.001;
+  const isWorldEntityActive = (...args) => global.ShadowShiftShadow.isWorldEntityActive(...args);
 
   function createRect(x, y, w, h) {
     return { x, y, w, h };
@@ -12,7 +13,12 @@
   function collectWorldSolids(state) {
     const solids = [...state.platforms, ...state.walls];
     for (const platform of state.shadowPlatforms) {
-      if (state.world === platform.world) {
+      if (isWorldEntityActive(platform, state.world)) {
+        solids.push(platform);
+      }
+    }
+    for (const platform of state.puzzlePlatforms ?? []) {
+      if (platform.active && isWorldEntityActive(platform, state.world)) {
         solids.push(platform);
       }
     }

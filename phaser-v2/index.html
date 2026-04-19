@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0d16">
+  <title>Shadow Shift Phaser V2</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <aside class="hud-panel">
+      <p class="eyebrow">Project Shadow Shift</p>
+      <h1>Phaser V2 Sandbox</h1>
+      <p class="subtitle">Phase 1 through Phase 3 migration branch parked outside the active `webjs` build.</p>
+
+      <section class="status-card">
+        <div><span>World</span><strong id="worldValue">Light</strong></div>
+        <div><span>Element</span><strong id="elementValue">None</strong></div>
+        <div><span>Weapon</span><strong id="weaponValue">Shard Blade I</strong></div>
+        <div><span>Objective</span><strong id="objectiveValue">Press Enter or click Enter the Ruin</strong></div>
+      </section>
+
+      <section class="controls-card">
+        <h2>Controls</h2>
+        <p><kbd>A</kbd><kbd>D</kbd> or arrows: Move</p>
+        <p><kbd>S</kbd> or <kbd>Down</kbd>: Down aim</p>
+        <p><kbd>Space</kbd>: Jump</p>
+        <p><kbd>Shift</kbd>: Dash</p>
+        <p><kbd>F</kbd>: Attack</p>
+        <p><kbd>Enter</kbd>: Start</p>
+      </section>
+    </aside>
+
+    <section class="game-panel">
+      <div id="phaser-root" aria-label="Shadow Shift Phaser V2 game view"></div>
+      <div id="touchHud" class="hidden" aria-hidden="true"></div>
+
+      <div id="startOverlay" class="screen-overlay">
+        <div class="screen-panel">
+          <p class="panel-kicker">Movement migration sandbox</p>
+          <h2>Shadow Shift Phaser V2</h2>
+          <p>Bootstrap, movement, and first-pass melee combat running in Phaser 3.</p>
+          <button id="startButton" type="button">Enter the Ruin</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
+  <script type="module" src="./phaser/main.js"></script>
+</body>
+</html>

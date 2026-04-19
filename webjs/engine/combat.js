@@ -38,6 +38,10 @@
         return { weight: 1.45, knockbackScale: 0.7, staggerScale: 0.78, staggerThreshold: 1.55, hitstopBonus: 0.01 };
       case "watcher":
         return { weight: 0.82, knockbackScale: 0.78, staggerScale: 0.88, staggerThreshold: 1.05, hitstopBonus: 0 };
+      case "bulwark":
+        return { weight: 2.05, knockbackScale: 0.48, staggerScale: 0.55, staggerThreshold: 2.15, hitstopBonus: 0.014 };
+      case "hound":
+        return { weight: 0.9, knockbackScale: 1.05, staggerScale: 0.96, staggerThreshold: 1.1, hitstopBonus: 0.002 };
       case "oracle":
         return { weight: 1.9, knockbackScale: 0.55, staggerScale: 0.52, staggerThreshold: 2.2, hitstopBonus: 0.015 };
       case "revenant":
