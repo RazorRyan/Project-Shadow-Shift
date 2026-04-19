@@ -3,9 +3,9 @@
 - [x] 01 phase foundation audit
 - [x] 02 phase game feel
 - [x] 03 phase animation state machine
-- [ ] 04 phase camera fx and impact
-- [ ] 05 phase input system
-- [ ] 06 phase player state
+- [x] 04 phase camera fx and impact
+- [x] 05 phase input system
+- [x] 06 phase player state
 - [ ] 07 phase combat framework
 - [ ] 08 phase enemy base
 - [ ] 09 phase enemy ai

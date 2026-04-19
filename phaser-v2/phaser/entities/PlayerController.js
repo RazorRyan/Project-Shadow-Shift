@@ -1,6 +1,7 @@
 import { PLAYER_MOVEMENT_CONFIG } from "../config/playerMovementConfig.js";
 import { PLAYER_COMBAT_CONFIG } from "../config/playerCombatConfig.js";
 import { canQueueComboAttack, getAttackProfile } from "../combat/playerAttackProfiles.js";
+import { applyDamageToPlayer, createPlayerState, resetPlayerState, tickPlayerState } from "../components/playerState.js";
 import { createPlayerPresentationDriver } from "../systems/playerPresentationDriver.js";
 
 function approachValue(current, target, delta) {
@@ -40,6 +41,7 @@ export class PlayerController {
     this.scene = scene;
     this.input = input;
     this.config = PLAYER_MOVEMENT_CONFIG;
+    this.state = createPlayerState();
     this.facing = 1;
     this.moveAxis = 0;
     this.dashTimer = 0;
@@ -56,6 +58,7 @@ export class PlayerController {
     this.wasGrounded = false;
     this.airborneFallSpeed = 0;
     this.landingRecoveryTimer = 0;
+    this.pendingLandingImpact = null;
     this.isDashing = false;
     this.attackBufferTimer = 0;
     this.attackTimer = 0;
@@ -88,8 +91,24 @@ export class PlayerController {
     return !this.isGrounded() && (this.sprite.body.blocked.left || this.sprite.body.blocked.right);
   }
 
+  isDead() {
+    return this.state.dead;
+  }
+
+  isInvulnerable() {
+    return this.state.invulnerabilityTimer > 0;
+  }
+
+  getHealth() {
+    return this.state.hp;
+  }
+
+  getMaxHealth() {
+    return this.state.maxHp;
+  }
+
   startDash() {
-    if (this.dashCooldown > 0 || this.dashTimer > 0 || this.attackTimer > 0) {
+    if (this.isDead() || this.dashCooldown > 0 || this.dashTimer > 0 || this.attackTimer > 0) {
       return;
     }
 
@@ -108,6 +127,7 @@ export class PlayerController {
     this.sprite.body.setVelocity(0, 0);
     this.sprite.body.setAllowGravity(true);
     this.sprite.body.setGravityY(this.config.gravity);
+    this.sprite.setAlpha(1);
     this.dashTimer = 0;
     this.dashCooldown = 0;
     this.coyoteTimer = 0;
@@ -122,6 +142,7 @@ export class PlayerController {
     this.wasGrounded = false;
     this.airborneFallSpeed = 0;
     this.landingRecoveryTimer = 0;
+    this.pendingLandingImpact = null;
     this.isDashing = false;
     this.attackBufferTimer = 0;
     this.attackTimer = 0;
@@ -134,15 +155,51 @@ export class PlayerController {
     this.queuedAttack = false;
     this.activeAttackProfile = null;
     this.attackTargetIds.clear();
+    resetPlayerState(this.state);
     this.presentation.update(0);
   }
 
   getVerticalAim() {
-    return (this.input.down.isDown || this.input.downAlt.isDown) ? 1 : 0;
+    return this.input.isDown("aimDown") ? 1 : 0;
   }
 
   canStartAttack() {
-    return this.dashTimer <= 0;
+    return !this.isDead() && this.dashTimer <= 0;
+  }
+
+  applyDamage({ damage = 1, sourceX = this.sprite.x } = {}) {
+    const result = applyDamageToPlayer(this.state, damage);
+    if (!result) {
+      return null;
+    }
+
+    this.attackTimer = 0;
+    this.attackCooldown = Math.max(this.attackCooldown, result.defeated ? 0 : 120);
+    this.activeAttackProfile = null;
+    this.queuedAttack = false;
+    this.dashTimer = 0;
+    this.isDashing = false;
+    this.sprite.body.setAllowGravity(true);
+    this.sprite.body.setGravityY(this.config.gravity);
+
+    if (result.defeated) {
+      this.sprite.body.setVelocity(0, 0);
+      this.sprite.setAlpha(0.4);
+      return result;
+    }
+
+    const direction = Math.sign(this.sprite.x - sourceX) || this.facing || 1;
+    this.sprite.body.setVelocity(direction * 180, -180);
+    return result;
+  }
+
+  consumeRespawnRequest() {
+    if (!this.state.pendingRespawn) {
+      return false;
+    }
+
+    this.state.pendingRespawn = false;
+    return true;
   }
 
   commitAttackProfile(profile) {
@@ -189,9 +246,17 @@ export class PlayerController {
     this.attackTargetIds.add(targetId);
   }
 
+  consumeLandingImpact() {
+    const impact = this.pendingLandingImpact;
+    this.pendingLandingImpact = null;
+    return impact;
+  }
+
   update(delta) {
     const deltaSeconds = delta / 1000;
     const body = this.sprite.body;
+
+    tickPlayerState(this.state, delta);
 
     this.dashTimer = Math.max(0, this.dashTimer - delta);
     this.dashCooldown = Math.max(0, this.dashCooldown - delta);
@@ -206,25 +271,32 @@ export class PlayerController {
     this.comboChainTimer = Math.max(0, this.comboChainTimer - delta);
     this.landingRecoveryTimer = Math.max(0, this.landingRecoveryTimer - delta);
 
+    if (this.isDead()) {
+      body.setAllowGravity(false);
+      body.setVelocity(0, 0);
+      this.sprite.setAlpha(0.4);
+      this.presentation.update(delta);
+      return;
+    }
+
     const startedGrounded = this.isGrounded();
 
-    const moveAxis = (this.input.right.isDown || this.input.rightAlt.isDown ? 1 : 0)
-      - (this.input.left.isDown || this.input.leftAlt.isDown ? 1 : 0);
+    const moveAxis = this.input.getAxis("moveLeft", "moveRight");
     this.moveAxis = moveAxis;
     if (moveAxis !== 0) {
       this.facing = moveAxis;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.input.jump)) {
+    if (this.input.wasPressed("jump")) {
       this.jumpBufferTimer = this.config.jumpBufferMs;
     }
-    if (Phaser.Input.Keyboard.JustUp(this.input.jump)) {
+    if (this.input.wasReleased("jump")) {
       this.jumpReleased = true;
     }
-    if (Phaser.Input.Keyboard.JustDown(this.input.dash)) {
+    if (this.input.wasPressed("dash")) {
       this.startDash();
     }
-    if (Phaser.Input.Keyboard.JustDown(this.input.attack)) {
+    if (this.input.wasPressed("attack")) {
       this.attackBufferTimer = PLAYER_COMBAT_CONFIG.attackKeyBufferMs;
     }
 
@@ -308,11 +380,21 @@ export class PlayerController {
 
     const endedGrounded = this.isGrounded();
     if (endedGrounded && !this.wasGrounded && this.airborneFallSpeed >= this.config.landingRecoveryFallThreshold) {
+      this.pendingLandingImpact = {
+        x: this.sprite.x,
+        y: body.bottom,
+        fallSpeed: this.airborneFallSpeed
+      };
       this.landingRecoveryTimer = this.config.landingRecoveryMs;
       this.airborneFallSpeed = 0;
     }
 
     this.presentation.update(delta);
+    if (this.state.hurtTimer > 0) {
+      this.sprite.setAlpha(this.state.invulnerabilityTimer > 0 && Math.floor(this.state.invulnerabilityTimer / 70) % 2 === 0 ? 0.45 : 0.72);
+    } else {
+      this.sprite.setAlpha(1);
+    }
     this.wasGrounded = endedGrounded;
     this.jumpReleased = false;
   }

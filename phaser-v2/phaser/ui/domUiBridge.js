@@ -1,11 +1,13 @@
 export function createDomUiBridge(scene) {
   const hud = {
+    room: document.getElementById("roomValue"),
     world: document.getElementById("worldValue"),
     element: document.getElementById("elementValue"),
     weapon: document.getElementById("weaponValue"),
     objective: document.getElementById("objectiveValue"),
     startOverlay: document.getElementById("startOverlay"),
     startButton: document.getElementById("startButton"),
+    roomToggleButton: document.getElementById("roomToggleButton"),
     touchHud: document.getElementById("touchHud")
   };
 
@@ -22,19 +24,19 @@ export function createDomUiBridge(scene) {
     scene.startRun();
   };
 
-  const onKeyDown = (event) => {
-    if (!scene.isStarted && (event.code === "Enter" || event.code === "Space")) {
-      event.preventDefault();
-      tryStart();
+  const toggleRoom = () => {
+    if (!scene.scene.isActive()) {
+      return;
     }
+    scene.toggleRoomMode();
   };
 
   hud.startButton.addEventListener("click", tryStart);
-  window.addEventListener("keydown", onKeyDown);
+  hud.roomToggleButton.addEventListener("click", toggleRoom);
 
   scene.events.once("shutdown", () => {
     hud.startButton.removeEventListener("click", tryStart);
-    window.removeEventListener("keydown", onKeyDown);
+    hud.roomToggleButton.removeEventListener("click", toggleRoom);
   });
 
   return {
@@ -48,6 +50,12 @@ export function createDomUiBridge(scene) {
     },
     setObjective(text) {
       hud.objective.textContent = text;
+    },
+    setRoomLabel(text) {
+      hud.room.textContent = text;
+    },
+    setRoomModeButtonLabel(text) {
+      hud.roomToggleButton.textContent = text;
     }
   };
 }
