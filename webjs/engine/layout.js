@@ -204,9 +204,119 @@
     };
   }
 
+  const PROCEDURAL_ROOM_TEMPLATES = [
+    {
+      id: "rampart-breach",
+      label: "Rampart Breach",
+      role: "start",
+      themes: ["rampart", "ash"],
+      connections: {
+        in: ["entry"],
+        out: ["ground", "climb"]
+      },
+      requirements: null,
+      combatDensity: 1,
+      checkpointSuitable: false,
+      weight: 2
+    },
+    {
+      id: "shadow-span",
+      label: "Shadow Span",
+      role: "mid",
+      themes: ["rampart", "galleries"],
+      connections: {
+        in: ["ground", "climb"],
+        out: ["ground", "shadow"]
+      },
+      requirements: {
+        abilities: ["ShadowSwap"]
+      },
+      combatDensity: 1,
+      checkpointSuitable: false,
+      weight: 2
+    },
+    {
+      id: "dash-crucible",
+      label: "Dash Crucible",
+      role: "mid",
+      themes: ["ash", "galleries"],
+      connections: {
+        in: ["ground", "shadow", "climb"],
+        out: ["ground", "climb"]
+      },
+      requirements: {
+        abilities: ["Dash"]
+      },
+      combatDensity: 2,
+      checkpointSuitable: false,
+      weight: 3
+    },
+    {
+      id: "ember-gauntlet",
+      label: "Ember Gauntlet",
+      role: "mid",
+      themes: ["ash"],
+      connections: {
+        in: ["ground", "climb"],
+        out: ["ground", "checkpoint"]
+      },
+      requirements: {
+        element: "Fire"
+      },
+      combatDensity: 3,
+      checkpointSuitable: false,
+      weight: 1
+    },
+    {
+      id: "galleries-rest",
+      label: "Galleries Rest",
+      role: "mid",
+      themes: ["galleries", "ash"],
+      connections: {
+        in: ["ground", "checkpoint", "climb"],
+        out: ["ground", "climb", "checkpoint"]
+      },
+      requirements: null,
+      combatDensity: 1,
+      checkpointSuitable: true,
+      weight: 2
+    },
+    {
+      id: "reliquary-ascent",
+      label: "Reliquary Ascent",
+      role: "mid",
+      themes: ["galleries", "boss"],
+      connections: {
+        in: ["ground", "climb", "checkpoint"],
+        out: ["ground", "climb"]
+      },
+      requirements: {
+        minWeaponStage: 1
+      },
+      combatDensity: 2,
+      checkpointSuitable: true,
+      weight: 2
+    },
+    {
+      id: "eclipse-approach",
+      label: "Eclipse Approach",
+      role: "finale",
+      themes: ["boss", "galleries"],
+      connections: {
+        in: ["ground", "climb", "checkpoint"],
+        out: ["exit"]
+      },
+      requirements: null,
+      combatDensity: 2,
+      checkpointSuitable: false,
+      weight: 2
+    }
+  ];
+
   global.ShadowShiftLayout = {
     createSeededRng,
     generateRoomChain,
-    validateLayoutChain
+    validateLayoutChain,
+    PROCEDURAL_ROOM_TEMPLATES
   };
 })(window);

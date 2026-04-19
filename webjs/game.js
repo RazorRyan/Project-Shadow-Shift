@@ -3,8 +3,10 @@ const {
   BASE_CANVAS_HEIGHT,
   MAX_PARTICLES,
   MAX_SLASH_EFFECTS,
-  SAVE_KEY
+  SAVE_KEY,
+  COLORS
 } = window.ShadowShiftConstants;
+const { clamp, approachValue, hexToRgb, hexToRgba, multiplyHex } = window.ShadowShiftUtils;
 const {
   createRect,
   aabbOverlap,
@@ -24,7 +26,7 @@ const {
   getReactionDuration
 } = window.ShadowShiftCombat;
 const { createBossController, resolveBossPhase, chooseBossAttack } = window.ShadowShiftBoss;
-const { generateRoomChain } = window.ShadowShiftLayout;
+const { generateRoomChain, PROCEDURAL_ROOM_TEMPLATES } = window.ShadowShiftLayout;
 const {
   resolveElementalHit,
   applyEnemyElementalStatus,
@@ -228,32 +230,6 @@ for (const button of document.querySelectorAll("[data-touch-tap]")) {
   button.addEventListener("pointerleave", clear);
 }
 
-const COLORS = {
-  light: "#eadfa0",
-  shadow: "#6677d6",
-  none: "#ffffff",
-  fire: "#ff7b4a",
-  ice: "#8bdcff",
-  wind: "#a9ffb3",
-  playerCore: "#f4efe1",
-  cape: "#191826",
-  steel: "#c1cbdb",
-  enemy: "#cf5c7b",
-  enemyHit: "#fff1f1",
-  gate: "#7d6c52",
-  gateOpen: "#8bf8c9",
-  burnable: "#6b4d32",
-  burnableHot: "#8d3b24",
-  pickupDash: "#f4d87c",
-  pickupWeapon: "#9be8ff",
-  goblin: "#8cb34d",
-  shadowWalker: "#6d6fc9",
-  demon: "#cf534f",
-  watcher: "#7ed7ff",
-  bulwark: "#d3c196",
-  hound: "#ff8d6a"
-};
-
 const PROGRESSION_ROUTE_DEFINITIONS = [
   {
     id: "recover-dash-core",
@@ -312,115 +288,6 @@ const PROGRESSION_ROUTE_DEFINITIONS = [
     objective: "Reach the exit shrine",
     summary: "The route out is finally clear.",
     isAvailable: (targetState) => !hasBossAlive()
-  }
-];
-
-const PROCEDURAL_ROOM_TEMPLATES = [
-  {
-    id: "rampart-breach",
-    label: "Rampart Breach",
-    role: "start",
-    themes: ["rampart", "ash"],
-    connections: {
-      in: ["entry"],
-      out: ["ground", "climb"]
-    },
-    requirements: null,
-    combatDensity: 1,
-    checkpointSuitable: false,
-    weight: 2
-  },
-  {
-    id: "shadow-span",
-    label: "Shadow Span",
-    role: "mid",
-    themes: ["rampart", "galleries"],
-    connections: {
-      in: ["ground", "climb"],
-      out: ["ground", "shadow"]
-    },
-    requirements: {
-      abilities: ["ShadowSwap"]
-    },
-    combatDensity: 1,
-    checkpointSuitable: false,
-    weight: 2
-  },
-  {
-    id: "dash-crucible",
-    label: "Dash Crucible",
-    role: "mid",
-    themes: ["ash", "galleries"],
-    connections: {
-      in: ["ground", "shadow", "climb"],
-      out: ["ground", "climb"]
-    },
-    requirements: {
-      abilities: ["Dash"]
-    },
-    combatDensity: 2,
-    checkpointSuitable: false,
-    weight: 3
-  },
-  {
-    id: "ember-gauntlet",
-    label: "Ember Gauntlet",
-    role: "mid",
-    themes: ["ash"],
-    connections: {
-      in: ["ground", "climb"],
-      out: ["ground", "checkpoint"]
-    },
-    requirements: {
-      element: "Fire"
-    },
-    combatDensity: 3,
-    checkpointSuitable: false,
-    weight: 1
-  },
-  {
-    id: "galleries-rest",
-    label: "Galleries Rest",
-    role: "mid",
-    themes: ["galleries", "ash"],
-    connections: {
-      in: ["ground", "checkpoint", "climb"],
-      out: ["ground", "climb", "checkpoint"]
-    },
-    requirements: null,
-    combatDensity: 1,
-    checkpointSuitable: true,
-    weight: 2
-  },
-  {
-    id: "reliquary-ascent",
-    label: "Reliquary Ascent",
-    role: "mid",
-    themes: ["galleries", "boss"],
-    connections: {
-      in: ["ground", "climb", "checkpoint"],
-      out: ["ground", "climb"]
-    },
-    requirements: {
-      minWeaponStage: 1
-    },
-    combatDensity: 2,
-    checkpointSuitable: true,
-    weight: 2
-  },
-  {
-    id: "eclipse-approach",
-    label: "Eclipse Approach",
-    role: "finale",
-    themes: ["boss", "galleries"],
-    connections: {
-      in: ["ground", "climb", "checkpoint"],
-      out: ["exit"]
-    },
-    requirements: null,
-    combatDensity: 2,
-    checkpointSuitable: false,
-    weight: 2
   }
 ];
 
@@ -865,16 +732,6 @@ function getEnemyMoveSettings(enemy) {
     default:
       return { accel: 720, decel: 760, turnSpeed: 1000 };
   }
-}
-
-function approachValue(current, target, delta) {
-  if (current < target) {
-    return Math.min(current + delta, target);
-  }
-  if (current > target) {
-    return Math.max(current - delta, target);
-  }
-  return target;
 }
 
 function accelerateEnemyTowards(enemy, targetVelocity, dt) {
@@ -6172,30 +6029,6 @@ function getPlayerTint() {
   }[state.element];
 
   return multiplyHex(worldTint, elementTint);
-}
-
-function multiplyHex(hexA, hexB) {
-  const a = hexToRgb(hexA);
-  const b = hexToRgb(hexB);
-  return `rgb(${Math.floor((a.r * b.r) / 255)}, ${Math.floor((a.g * b.g) / 255)}, ${Math.floor((a.b * b.b) / 255)})`;
-}
-
-function hexToRgb(hex) {
-  const cleaned = hex.replace("#", "");
-  return {
-    r: parseInt(cleaned.slice(0, 2), 16),
-    g: parseInt(cleaned.slice(2, 4), 16),
-    b: parseInt(cleaned.slice(4, 6), 16)
-  };
-}
-
-function hexToRgba(hex, alpha) {
-  const { r, g, b } = hexToRgb(hex);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function resetRun(message) {
