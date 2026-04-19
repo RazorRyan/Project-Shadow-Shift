@@ -1,4 +1,5 @@
 import { isWorldEntityActive } from "./shadow";
+import type { World } from "./types";
 
 const EPSILON = 0.001;
 
@@ -11,6 +12,20 @@ export interface Rect {
   active?: boolean;
 }
 
+export interface ActiveRect extends Rect {
+  active: boolean;
+}
+
+export interface CollisionState {
+  platforms: Rect[];
+  walls: Rect[];
+  shadowPlatforms: Rect[];
+  puzzlePlatforms?: ActiveRect[];
+  barrier: ActiveRect;
+  gate: ActiveRect;
+  world: World;
+}
+
 export function createRect(x: number, y: number, w: number, h: number): Rect {
   return { x, y, w, h };
 }
@@ -19,7 +34,7 @@ export function aabbOverlap(a: Rect, b: Rect): boolean {
   return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
-export function collectWorldSolids(state: any): Rect[] {
+export function collectWorldSolids(state: CollisionState): Rect[] {
   const solids: Rect[] = [...state.platforms, ...state.walls];
   for (const platform of state.shadowPlatforms) {
     if (isWorldEntityActive(platform, state.world)) solids.push(platform);

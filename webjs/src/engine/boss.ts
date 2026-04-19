@@ -1,12 +1,8 @@
-export interface BossController {
-  phase: string;
-  lastAttackId: string | null;
-  attackCatalog: any[];
-  phaseThresholds: { id: string; hpRatio: number }[];
-  introWakeX: number;
-}
+import type { BossController, BossConfig, BossContext } from "./types";
 
-export function createBossController(config: any): BossController {
+export type { BossController } from "./types";
+
+export function createBossController(config: BossConfig): BossController {
   return {
     phase: config.initialPhase ?? "phase-1",
     lastAttackId: null,
@@ -16,7 +12,7 @@ export function createBossController(config: any): BossController {
   };
 }
 
-export function resolveBossPhase(enemy: any, controller: BossController) {
+export function resolveBossPhase(enemy: { hp: number; maxHp: number }, controller: BossController) {
   const hpRatio = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
   let resolvedPhase = controller.phaseThresholds[0]?.id ?? controller.phase;
   for (const threshold of controller.phaseThresholds) {
@@ -27,7 +23,7 @@ export function resolveBossPhase(enemy: any, controller: BossController) {
   return { phase: resolvedPhase, changed };
 }
 
-export function chooseBossAttack(controller: BossController, context: any) {
+export function chooseBossAttack(controller: BossController, context: BossContext) {
   const candidates = controller.attackCatalog
     .filter((a) => !a.phase || a.phase === controller.phase)
     .filter((a) => !a.canUse || a.canUse(context));

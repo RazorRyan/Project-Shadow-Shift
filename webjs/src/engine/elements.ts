@@ -1,11 +1,19 @@
-export const ELEMENT_COMBAT_PROFILES: Record<string, any> = {
+import type {
+  Element, EnemyType, Enemy, Hazard,
+  ElementalCombatProfile, EnemyElementProfile,
+  ElementalHitResult, HazardContactProfile, ElementalInteractionResult,
+  ElementalInteractionOutcome
+} from "./types";
+import type { Hitbox } from "./types";
+
+export const ELEMENT_COMBAT_PROFILES: Record<Element, ElementalCombatProfile> = {
   None:  { damageMultiplier: 1, impactBonus: 0,    knockbackMultiplier: 1,    hitstopBonus: 0,     statusEffect: null },
   Fire:  { damageMultiplier: 1, impactBonus: 0.06, knockbackMultiplier: 1,    hitstopBonus: 0.004, statusEffect: { type: "scorch", duration: 1.8, tickInterval: 0.6, tickDamage: 1 } },
   Ice:   { damageMultiplier: 1, impactBonus: 0.08, knockbackMultiplier: 0.94, hitstopBonus: 0.003, statusEffect: { type: "chill",  duration: 1.5, slowMultiplier: 0.72 } },
   Wind:  { damageMultiplier: 1, impactBonus: 0.18, knockbackMultiplier: 1.18, hitstopBonus: 0.002, statusEffect: { type: "gust",   duration: 0.5 } }
 };
 
-export const ENEMY_ELEMENT_PROFILES: Record<string, { vulnerabilities: string[]; resistances: string[] }> = {
+export const ENEMY_ELEMENT_PROFILES: Partial<Record<EnemyType, EnemyElementProfile>> = {
   goblin:       { vulnerabilities: ["Fire"],  resistances: [] },
   watcher:      { vulnerabilities: ["Wind"],  resistances: ["Ice"] },
   demon:        { vulnerabilities: ["Ice"],   resistances: ["Fire"] },
@@ -16,15 +24,18 @@ export const ENEMY_ELEMENT_PROFILES: Record<string, { vulnerabilities: string[];
   revenant:     { vulnerabilities: ["Fire"],  resistances: ["Wind"] }
 };
 
-export function getElementCombatProfile(element: string) {
+export function getElementCombatProfile(element: Element): ElementalCombatProfile {
   return ELEMENT_COMBAT_PROFILES[element] ?? ELEMENT_COMBAT_PROFILES.None;
 }
 
-export function getEnemyElementProfile(enemy: any) {
+export function getEnemyElementProfile(enemy: Pick<Enemy, "type">): EnemyElementProfile {
   return ENEMY_ELEMENT_PROFILES[enemy.type] ?? { vulnerabilities: [], resistances: [] };
 }
 
-export function resolveElementalHit(enemy: any, hitbox: any) {
+export function resolveElementalHit(
+  enemy: Pick<Enemy, "type">,
+  hitbox: Pick<Hitbox, "element" | "damage">
+): ElementalHitResult {
   const element = hitbox.element ?? "None";
   const combatProfile = getElementCombatProfile(element);
   const enemyProfile = getEnemyElementProfile(enemy);
@@ -51,7 +62,7 @@ export function resolveElementalHit(enemy: any, hitbox: any) {
   return { element, damage, impactBonus, knockbackMultiplier, hitstopBonus: combatProfile.hitstopBonus, reactionText, statusEffect };
 }
 
-export function applyEnemyElementalStatus(enemy: any, elementalResult: any) {
+export function applyEnemyElementalStatus(enemy: Enemy, elementalResult: ElementalHitResult): void {
   if (!elementalResult.statusEffect || elementalResult.element === "None") return;
   enemy.elementalState = {
     type: elementalResult.statusEffect.type,
@@ -63,7 +74,7 @@ export function applyEnemyElementalStatus(enemy: any, elementalResult: any) {
   };
 }
 
-export function updateEnemyElementalState(enemy: any, dt: number) {
+export function updateEnemyElementalState(enemy: Enemy, dt: number): { damage: number; expired: boolean } {
   if (!enemy.elementalState || enemy.elementalState.type === "none" || enemy.elementalState.timer <= 0) {
     return { damage: 0, expired: false };
   }
@@ -81,14 +92,14 @@ export function updateEnemyElementalState(enemy: any, dt: number) {
   return { damage, expired };
 }
 
-export function getEnemyElementSpeedMultiplier(enemy: any): number {
+export function getEnemyElementSpeedMultiplier(enemy: Enemy): number {
   if (!enemy.elementalState || enemy.elementalState.type === "none" || enemy.elementalState.timer <= 0) return 1;
   if (enemy.elementalState.type === "chill") return enemy.elementalState.slowMultiplier ?? 0.72;
   if (enemy.elementalState.type === "gust") return 1.05;
   return 1;
 }
 
-export function getHazardContactProfile(hazard: any, activeElement: string) {
+export function getHazardContactProfile(hazard: Hazard, activeElement: Element): HazardContactProfile {
   if ((hazard.dampenedTimer ?? 0) > 0) {
     return { active: false, damage: 0, knockbackMultiplier: 0, message: "The frost spikes have been tempered" };
   }
@@ -107,11 +118,15 @@ export function getHazardContactProfile(hazard: any, activeElement: string) {
   return { active: damage > 0, damage, knockbackMultiplier, message };
 }
 
-export function applyEnvironmentElementReaction(targetType: string, target: any, element: string) {
+export function applyEnvironmentElementReaction(
+  targetType: string,
+  target: Hazard,
+  element: Element
+): ElementalInteractionResult {
   if (!element || element === "None") return { outcome: "none", changed: false, message: null, color: null };
   if (targetType === "barrier") {
-    if (element === "Fire") return { outcome: "clear",  changed: true,  message: "Barrier burned away",                        color: "#ff9f68" };
-    if (element === "Ice")  return { outcome: "fail",   changed: false, message: "Ice only hardens the ash barrier",           color: "#bfefff" };
+    if (element === "Fire") return { outcome: "clear",  changed: true,  message: "Barrier burned away",                         color: "#ff9f68" };
+    if (element === "Ice")  return { outcome: "fail",   changed: false, message: "Ice only hardens the ash barrier",            color: "#bfefff" };
     if (element === "Wind") return { outcome: "fail",   changed: false, message: "Wind stirs the ash but cannot break the seal", color: "#d8fff1" };
   }
   if (targetType === "hazard" && target.kind === "spikes" && target.element === "Ice") {
@@ -124,7 +139,7 @@ export function applyEnvironmentElementReaction(targetType: string, target: any,
   return { outcome: "none", changed: false, message: null, color: null };
 }
 
-export function updateEnvironmentElementState(state: any, dt: number) {
+export function updateEnvironmentElementState(state: { hazards?: Hazard[] }, dt: number): void {
   for (const hazard of state.hazards ?? []) {
     hazard.dampenedTimer = Math.max(0, (hazard.dampenedTimer ?? 0) - dt);
   }

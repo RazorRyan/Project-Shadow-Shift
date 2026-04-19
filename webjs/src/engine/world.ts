@@ -1,4 +1,6 @@
-export function getProgressionState(state: any) {
+import type { Requirements, ProgressionState } from "./types";
+
+export function getProgressionState(state: any): ProgressionState {
   return {
     abilities: state.abilityUnlocked,
     elements: {
@@ -17,7 +19,11 @@ export function getProgressionState(state: any) {
   };
 }
 
-export function meetsRequirements(requirements: any, state: any, context: any = {}): boolean {
+export function meetsRequirements(
+  requirements: Requirements | null | undefined,
+  state: any,
+  context: { requirementState?: ProgressionState } = {}
+): boolean {
   if (!requirements) return true;
   const rs = context.requirementState ?? getProgressionState(state);
 

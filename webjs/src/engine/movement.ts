@@ -1,4 +1,5 @@
 import { approachValue } from "./utils";
+import type { Element, PlayerTuningOverrides, PlayerVelocityState } from "./types";
 
 export const BASE_MOVEMENT_TUNING = {
   moveSpeed: 320,
@@ -37,7 +38,7 @@ export const BASE_MOVEMENT_TUNING = {
 
 export type MovementTuning = typeof BASE_MOVEMENT_TUNING;
 
-export function getMovementTuning(state: any, player: any): MovementTuning {
+export function getMovementTuning(state: { element: Element }, player: PlayerTuningOverrides): MovementTuning {
   const tuning = { ...BASE_MOVEMENT_TUNING };
   if (state.element === "Wind") {
     tuning.moveSpeed *= 1.18;
@@ -57,7 +58,7 @@ export function getMovementTuning(state: any, player: any): MovementTuning {
   return tuning;
 }
 
-export function resolveHorizontalVelocity(player: any, movement: MovementTuning, moveAxis: number, dt: number): number {
+export function resolveHorizontalVelocity(player: PlayerVelocityState, movement: MovementTuning, moveAxis: number, dt: number): number {
   if (player.wallJumpLock > 0) return player.vx;
 
   let targetSpeed = moveAxis * movement.moveSpeed;

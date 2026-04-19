@@ -1,6 +1,37 @@
 import { meetsRequirements } from "./world";
+import type { Requirements, ProgressionState } from "./types";
 
-function hashSeed(input: any): number {
+type RequirementsChecker = (requirements: Requirements | null | undefined, state: ProgressionState | null) => boolean;
+
+interface RoomTemplate {
+  id: string;
+  label: string;
+  role: "start" | "mid" | "finale";
+  themes: string[];
+  connections: { in: string[]; out: string[] };
+  requirements: Requirements | null;
+  combatDensity: number;
+  checkpointSuitable: boolean;
+  weight: number;
+}
+
+interface ChainEntry {
+  templateId: string;
+  label: string;
+  role: string;
+}
+
+interface GenerateOptions {
+  seed?: string | number;
+  chainLength?: number;
+  meetsRequirements?: RequirementsChecker;
+  requirementState?: ProgressionState | null;
+  maxCombatDensity?: number;
+  theme?: string | null;
+  preferCheckpoint?: boolean;
+}
+
+function hashSeed(input: unknown): number {
   const text = String(input ?? "shadow-shift");
   let hash = 2166136261;
   for (let i = 0; i < text.length; i++) {
@@ -10,7 +41,7 @@ function hashSeed(input: any): number {
   return hash >>> 0;
 }
 
-function createSeededRng(seedInput: any): () => number {
+function createSeededRng(seedInput: unknown): () => number {
   let seed = hashSeed(seedInput) || 1;
   return function nextRandom() {
     seed = (seed * 1664525 + 1013904223) >>> 0;
@@ -18,7 +49,7 @@ function createSeededRng(seedInput: any): () => number {
   };
 }
 
-function pickWeightedTemplate(templates: any[], random: () => number) {
+function pickWeightedTemplate(templates: RoomTemplate[], random: () => number): RoomTemplate | null {
   const total = templates.reduce((s, t) => s + (t.weight ?? 1), 0);
   if (total <= 0) return templates[0] ?? null;
   let roll = random() * total;
@@ -29,13 +60,17 @@ function pickWeightedTemplate(templates: any[], random: () => number) {
   return templates[templates.length - 1] ?? null;
 }
 
-function areConnectionsCompatible(from: any, to: any): boolean {
+function areConnectionsCompatible(from: RoomTemplate, to: RoomTemplate): boolean {
   const exits = from.connections?.out ?? [];
   const entries = to.connections?.in ?? [];
   return exits.some((c: string) => entries.includes(c));
 }
 
-export function validateLayoutChain(chain: any[], templatesById: Map<string, any>, options: any = {}) {
+export function validateLayoutChain(
+  chain: ChainEntry[],
+  templatesById: Map<string, RoomTemplate>,
+  options: { meetsRequirements?: RequirementsChecker; requirementState?: ProgressionState | null; maxCombatDensity?: number } = {}
+) {
   const validation: { valid: boolean; errors: string[] } = { valid: true, errors: [] };
   if (!chain?.length) { validation.valid = false; validation.errors.push("No chain was generated."); return validation; }
   if (chain[0]?.role !== "start") { validation.valid = false; validation.errors.push("Generated chain is missing a start template."); }
@@ -58,28 +93,28 @@ export function validateLayoutChain(chain: any[], templatesById: Map<string, any
   return validation;
 }
 
-export function generateRoomChain(roomTemplates: any[], options: any = {}) {
+export function generateRoomChain(roomTemplates: RoomTemplate[], options: GenerateOptions = {}) {
   const templates = roomTemplates ?? [];
   const random = createSeededRng(options.seed ?? "shadow-shift-layout");
   const chainLength = Math.max(3, options.chainLength ?? 4);
-  const req = options.meetsRequirements ?? meetsRequirements;
+  const req: RequirementsChecker = options.meetsRequirements ?? meetsRequirements;
   const rs = options.requirementState ?? null;
   const maxDensity = options.maxCombatDensity ?? 3;
   const desiredTheme = options.theme ?? null;
   const preferCheckpoint = options.preferCheckpoint !== false;
-  const byId = new Map(templates.map((t) => [t.id, t]));
+  const byId = new Map(templates.map((t) => [t.id, t] as [string, RoomTemplate]));
 
   let available = templates.filter((t) => req(t.requirements, rs) && (t.combatDensity ?? 0) <= maxDensity);
   if (desiredTheme) {
-    const themed = available.filter((t) => (t.themes ?? []).includes(desiredTheme));
-    if (themed.length >= 3 && themed.some((t: any) => t.role === "start") && themed.some((t: any) => t.role === "finale")) {
+    const themed = available.filter((t) => t.themes.includes(desiredTheme));
+    if (themed.length >= 3 && themed.some((t) => t.role === "start") && themed.some((t) => t.role === "finale")) {
       available = themed;
     }
   }
 
   const starts = available.filter((t) => t.role === "start");
   const finales = available.filter((t) => t.role === "finale");
-  const chain: any[] = [];
+  const chain: ChainEntry[] = [];
   const used = new Set<string>();
   let prev = pickWeightedTemplate(starts.length ? starts : available, random);
 
@@ -95,10 +130,10 @@ export function generateRoomChain(roomTemplates: any[], options: any = {}) {
     let candidates = available.filter((t) => {
       if (used.has(t.id) || t.role === "start" || t.role === "finale") return false;
       if (needsCheckpoint && !t.checkpointSuitable) return false;
-      return areConnectionsCompatible(prev, t);
+      return areConnectionsCompatible(prev!, t);
     });
     if (!candidates.length) {
-      candidates = available.filter((t) => !used.has(t.id) && t.role !== "start" && t.role !== "finale" && areConnectionsCompatible(prev, t));
+      candidates = available.filter((t) => !used.has(t.id) && t.role !== "start" && t.role !== "finale" && areConnectionsCompatible(prev!, t));
     }
     const next = pickWeightedTemplate(candidates, random);
     if (!next) break;
@@ -107,7 +142,7 @@ export function generateRoomChain(roomTemplates: any[], options: any = {}) {
     prev = next;
   }
 
-  const compatibleFinales = finales.filter((t) => areConnectionsCompatible(prev, t));
+  const compatibleFinales = finales.filter((t) => areConnectionsCompatible(prev!, t));
   const finale = pickWeightedTemplate(compatibleFinales.length ? compatibleFinales : finales, random);
   if (finale && !used.has(finale.id)) {
     chain.push({ templateId: finale.id, label: finale.label, role: finale.role });
@@ -117,7 +152,7 @@ export function generateRoomChain(roomTemplates: any[], options: any = {}) {
   return { seed: String(options.seed ?? "shadow-shift-layout"), chain, validation };
 }
 
-export const PROCEDURAL_ROOM_TEMPLATES = [
+export const PROCEDURAL_ROOM_TEMPLATES: RoomTemplate[] = [
   { id: "rampart-breach",    label: "Rampart Breach",    role: "start",  themes: ["rampart", "ash"],            connections: { in: ["entry"],                           out: ["ground", "climb"] },             requirements: null,                      combatDensity: 1, checkpointSuitable: false, weight: 2 },
   { id: "shadow-span",       label: "Shadow Span",       role: "mid",    themes: ["rampart", "galleries"],      connections: { in: ["ground", "climb"],                 out: ["ground", "shadow"] },            requirements: { abilities: ["ShadowSwap"] }, combatDensity: 1, checkpointSuitable: false, weight: 2 },
   { id: "dash-crucible",     label: "Dash Crucible",     role: "mid",    themes: ["ash", "galleries"],          connections: { in: ["ground", "shadow", "climb"],       out: ["ground", "climb"] },             requirements: { abilities: ["Dash"] },   combatDensity: 2, checkpointSuitable: false, weight: 3 },

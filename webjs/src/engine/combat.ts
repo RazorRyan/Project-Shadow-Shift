@@ -1,4 +1,8 @@
-export function createHitbox(options: any) {
+import type { Hitbox, HitboxInit, Hurtbox, ImpactTuning, Team, ReactionType } from "./types";
+import type { Rect } from "./collision";
+import type { EnemyType } from "./types";
+
+export function createHitbox(options: HitboxInit): Hitbox {
   return {
     ownerType: options.ownerType,
     ownerId: options.ownerId,
@@ -16,31 +20,36 @@ export function createHitbox(options: any) {
   };
 }
 
-export function createHurtbox(targetType: string, targetId: string, rect: any, team = "enemy") {
+export function createHurtbox(
+  targetType: string,
+  targetId: string,
+  rect: Rect,
+  team: Team = "enemy"
+): Hurtbox {
   return { targetType, targetId, team, x: rect.x, y: rect.y, w: rect.w, h: rect.h };
 }
 
-export function getEnemyImpactTuning(enemy: any) {
+export function getEnemyImpactTuning(enemy: { type: EnemyType }): ImpactTuning {
   switch (enemy.type) {
-    case "demon":       return { weight: 1.45, knockbackScale: 0.7,  staggerScale: 0.78, staggerThreshold: 1.55, hitstopBonus: 0.01 };
-    case "watcher":     return { weight: 0.82, knockbackScale: 0.78, staggerScale: 0.88, staggerThreshold: 1.05, hitstopBonus: 0 };
-    case "bulwark":     return { weight: 2.05, knockbackScale: 0.48, staggerScale: 0.55, staggerThreshold: 2.15, hitstopBonus: 0.014 };
-    case "hound":       return { weight: 0.9,  knockbackScale: 1.05, staggerScale: 0.96, staggerThreshold: 1.1,  hitstopBonus: 0.002 };
-    case "oracle":      return { weight: 1.9,  knockbackScale: 0.55, staggerScale: 0.52, staggerThreshold: 2.2,  hitstopBonus: 0.015 };
-    case "revenant":    return { weight: 1.6,  knockbackScale: 0.6,  staggerScale: 0.68, staggerThreshold: 1.85, hitstopBonus: 0.012 };
-    case "shadowWalker":return { weight: 1,    knockbackScale: 0.9,  staggerScale: 0.92, staggerThreshold: 1.2,  hitstopBonus: 0 };
-    default:            return { weight: 0.95, knockbackScale: 1,    staggerScale: 1,    staggerThreshold: 1,    hitstopBonus: 0 };
+    case "demon":        return { weight: 1.45, knockbackScale: 0.7,  staggerScale: 0.78, staggerThreshold: 1.55, hitstopBonus: 0.01 };
+    case "watcher":      return { weight: 0.82, knockbackScale: 0.78, staggerScale: 0.88, staggerThreshold: 1.05, hitstopBonus: 0 };
+    case "bulwark":      return { weight: 2.05, knockbackScale: 0.48, staggerScale: 0.55, staggerThreshold: 2.15, hitstopBonus: 0.014 };
+    case "hound":        return { weight: 0.9,  knockbackScale: 1.05, staggerScale: 0.96, staggerThreshold: 1.1,  hitstopBonus: 0.002 };
+    case "oracle":       return { weight: 1.9,  knockbackScale: 0.55, staggerScale: 0.52, staggerThreshold: 2.2,  hitstopBonus: 0.015 };
+    case "revenant":     return { weight: 1.6,  knockbackScale: 0.6,  staggerScale: 0.68, staggerThreshold: 1.85, hitstopBonus: 0.012 };
+    case "shadowWalker": return { weight: 1,    knockbackScale: 0.9,  staggerScale: 0.92, staggerThreshold: 1.2,  hitstopBonus: 0 };
+    default:             return { weight: 0.95, knockbackScale: 1,    staggerScale: 1,    staggerThreshold: 1,    hitstopBonus: 0 };
   }
 }
 
-export function getImpactPowerForHit(hitbox: any): number {
+export function getImpactPowerForHit(hitbox: Pick<Hitbox, "hitTag">): number {
   if (hitbox.hitTag === "finisher") return 2.5;
   if (hitbox.hitTag === "pogo") return 1.35;
   if (hitbox.hitTag === "heavy") return 1.8;
   return 1;
 }
 
-export function getReactionTypeFromHit(hitbox: any): string {
+export function getReactionTypeFromHit(hitbox: Pick<Hitbox, "hitTag" | "element">): ReactionType {
   if (hitbox.hitTag === "finisher") return "finisher";
   if (hitbox.hitTag === "pogo") return "pogo";
   if (hitbox.element && hitbox.element !== "None") return "elemental";
@@ -48,7 +57,7 @@ export function getReactionTypeFromHit(hitbox: any): string {
   return "light";
 }
 
-export function getReactionDuration(reactionType: string): number {
+export function getReactionDuration(reactionType: ReactionType): number {
   switch (reactionType) {
     case "finisher": return 0.24;
     case "pogo": return 0.2;

@@ -1,22 +1,23 @@
 import { createTimingController } from "./timing";
+import type { RuntimeConfig } from "./types";
 
-export function createRuntime(config: any) {
+export function createRuntime(config: RuntimeConfig) {
   const timing = createTimingController(config.timing);
   const getFrameFlags = config.getFrameFlags ?? (() => ({}));
-  const onFrame: (snapshot: any) => void = config.onFrame;
+  const onFrame = config.onFrame;
 
-  function frame(now: number) {
+  function frame(now: number): void {
     const snapshot = timing.beginFrame(now, getFrameFlags());
     onFrame(snapshot);
     requestAnimationFrame(frame);
   }
 
   return {
-    start() {
+    start(): void {
       timing.reset(performance.now());
       requestAnimationFrame(frame);
     },
-    reset(now = performance.now()) {
+    reset(now = performance.now()): void {
       timing.reset(now);
     }
   };

@@ -1,26 +1,28 @@
-export function ensureReactiveState(object: any) {
-  object.reactiveState = object.reactiveState ?? { pulses: {}, flags: {} };
+import type { ReactiveObject, ReactiveState, ReactiveTrigger, ReactiveResult, ReactiveTriggerType } from "./types";
+
+export function ensureReactiveState(object: ReactiveObject): ReactiveState {
+  if (!object.reactiveState) object.reactiveState = { pulses: {}, flags: {} };
   return object.reactiveState;
 }
 
-export function setReactivePulse(object: any, key: string, duration: number) {
+export function setReactivePulse(object: ReactiveObject, key: string, duration: number): void {
   const rs = ensureReactiveState(object);
   rs.pulses[key] = Math.max(rs.pulses[key] ?? 0, duration);
 }
 
-export function getReactivePulse(object: any, key: string): number {
+export function getReactivePulse(object: ReactiveObject, key: string): number {
   return object.reactiveState?.pulses?.[key] ?? 0;
 }
 
-export function setReactiveFlag(object: any, key: string, value = true) {
+export function setReactiveFlag(object: ReactiveObject, key: string, value = true): void {
   ensureReactiveState(object).flags[key] = value;
 }
 
-export function getReactiveFlag(object: any, key: string): boolean {
+export function getReactiveFlag(object: ReactiveObject, key: string): boolean {
   return Boolean(object.reactiveState?.flags?.[key]);
 }
 
-export function updateReactiveTimers(objects: any[], dt: number) {
+export function updateReactiveTimers(objects: ReactiveObject[], dt: number): void {
   for (const object of objects ?? []) {
     const rs = object?.reactiveState;
     if (!rs?.pulses) continue;
@@ -30,19 +32,21 @@ export function updateReactiveTimers(objects: any[], dt: number) {
   }
 }
 
-export function triggerReactiveObject(object: any, trigger: { type: string; [key: string]: any }) {
+export function triggerReactiveObject(object: ReactiveObject, trigger: ReactiveTrigger): ReactiveResult {
   ensureReactiveState(object);
-  const supported = object.reactivity?.triggers ?? [];
+  const supported: ReactiveTriggerType[] = object.reactivity?.triggers ?? [];
   if (!supported.includes(trigger.type)) return { accepted: false };
 
   if (trigger.type === "swap") {
     setReactivePulse(object, "swap", 0.8);
-    if (object.reactivity?.responses?.swap?.setFlag) setReactiveFlag(object, object.reactivity.responses.swap.setFlag, true);
+    const flag = object.reactivity?.responses?.swap?.setFlag;
+    if (flag) setReactiveFlag(object, flag, true);
     return { accepted: true, message: object.reactivity?.responses?.swap?.message ?? null };
   }
   if (trigger.type === "rest") {
     setReactivePulse(object, "rest", 1.2);
-    if (object.reactivity?.responses?.rest?.setFlag) setReactiveFlag(object, object.reactivity.responses.rest.setFlag, true);
+    const flag = object.reactivity?.responses?.rest?.setFlag;
+    if (flag) setReactiveFlag(object, flag, true);
     return { accepted: true, message: object.reactivity?.responses?.rest?.message ?? null };
   }
   if (trigger.type === "attack") {

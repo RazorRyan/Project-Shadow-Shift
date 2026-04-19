@@ -1,12 +1,12 @@
 export interface Entity {
   id: string;
   type: string;
-  source: any;
-  components: Record<string, any>;
+  source: unknown;
+  components: Record<string, unknown>;
 }
 
 export interface EntityRegistry {
-  register(type: string, source: any, components?: Record<string, any>): Entity;
+  register(type: string, source: unknown, components?: Record<string, unknown>): Entity;
   clear(): void;
   getByType(type: string): Entity[];
 }
@@ -16,7 +16,7 @@ export function createEntityRegistry(): EntityRegistry {
   const byType = new Map<string, Entity[]>();
   let nextId = 1;
 
-  function register(type: string, source: any, components: Record<string, any> = {}): Entity {
+  function register(type: string, source: unknown, components: Record<string, unknown> = {}): Entity {
     const entity: Entity = { id: `${type}-${nextId++}`, type, source, components };
     entities.set(entity.id, entity);
     if (!byType.has(type)) byType.set(type, []);
@@ -24,7 +24,7 @@ export function createEntityRegistry(): EntityRegistry {
     return entity;
   }
 
-  function clear() {
+  function clear(): void {
     entities.clear();
     byType.clear();
     nextId = 1;

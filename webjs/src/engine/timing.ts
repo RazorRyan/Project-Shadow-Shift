@@ -1,4 +1,6 @@
-export function createTimingController(options: any = {}) {
+import type { TimingOptions, FrameFlags, TimingSnapshot } from "./types";
+
+export function createTimingController(options: TimingOptions = {}) {
   const fixedStepSeconds = options.fixedStepSeconds ?? (1 / 120);
   const maxFrameDeltaSeconds = options.maxFrameDeltaSeconds ?? (1 / 30);
   const maxFixedSteps = options.maxFixedSteps ?? 4;
@@ -7,13 +9,13 @@ export function createTimingController(options: any = {}) {
   let accumulatorSeconds = 0;
   let frameIndex = 0;
 
-  function reset(now: number | null = null) {
+  function reset(now: number | null = null): void {
     lastTimestamp = now;
     accumulatorSeconds = 0;
     frameIndex = 0;
   }
 
-  function beginFrame(now: number, flags: any = {}) {
+  function beginFrame(now: number, flags: FrameFlags = {}): TimingSnapshot {
     if (lastTimestamp == null) lastTimestamp = now;
     const rawDeltaSeconds = Math.max(0, (now - lastTimestamp) / 1000);
     lastTimestamp = now;
