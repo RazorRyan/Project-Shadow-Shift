@@ -71,6 +71,8 @@ export class PlayerController {
     this.queuedAttack = false;
     this.activeAttackProfile = null;
     this.attackTargetIds = new Set();
+    this.canDoubleJump = false;
+    this.airJumpsUsed = 0;
 
     this.sprite = scene.physics.add.sprite(x, y, "player-block");
     this.sprite.setDisplaySize(this.config.width, this.config.height);
@@ -155,6 +157,7 @@ export class PlayerController {
     this.queuedAttack = false;
     this.activeAttackProfile = null;
     this.attackTargetIds.clear();
+    this.airJumpsUsed = 0;
     resetPlayerState(this.state);
     this.presentation.update(0);
   }
@@ -305,6 +308,7 @@ export class PlayerController {
       this.wallSliding = false;
       this.jumpCutReady = false;
       this.airborneFallSpeed = 0;
+      this.airJumpsUsed = 0;
     } else {
       this.airborneFallSpeed = Math.max(this.airborneFallSpeed, body.velocity.y);
     }
@@ -343,6 +347,7 @@ export class PlayerController {
       this.coyoteTimer = 0;
       this.jumpCutReady = true;
       this.wallSliding = false;
+      this.airJumpsUsed = 0;
     } else if (this.jumpBufferTimer > 0 && this.wallJumpGraceTimer > 0 && this.lastWallDirection !== 0) {
       body.setVelocityX(-this.lastWallDirection * this.config.wallJumpHorizontalSpeed);
       body.setVelocityY(-this.config.jumpForce * this.config.wallJumpVerticalMultiplier);
@@ -350,6 +355,12 @@ export class PlayerController {
       this.wallJumpLock = this.config.wallJumpLockDurationMs;
       this.wallJumpGraceTimer = 0;
       this.wallSliding = false;
+      this.jumpCutReady = true;
+      this.airJumpsUsed = 0;
+    } else if (this.jumpBufferTimer > 0 && this.canDoubleJump && this.airJumpsUsed < 1 && !this.isGrounded() && this.dashTimer <= 0) {
+      body.setVelocityY(-this.config.jumpForce * 0.86);
+      this.jumpBufferTimer = 0;
+      this.airJumpsUsed = 1;
       this.jumpCutReady = true;
     }
 

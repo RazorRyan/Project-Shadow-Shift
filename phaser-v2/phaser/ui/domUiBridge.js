@@ -56,6 +56,9 @@ export function createDomUiBridge(scene) {
     },
     setRoomModeButtonLabel(text) {
       hud.roomToggleButton.textContent = text;
-    }
+    },
+    setWorldPhase(text) {
+      hud.world.textContent = text;
+    },
   };
 }

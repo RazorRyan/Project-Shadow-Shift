@@ -6,7 +6,8 @@ const INPUT_BINDINGS = {
   dash: [Phaser.Input.Keyboard.KeyCodes.SHIFT],
   attack: [Phaser.Input.Keyboard.KeyCodes.F],
   start: [Phaser.Input.Keyboard.KeyCodes.ENTER, Phaser.Input.Keyboard.KeyCodes.SPACE],
-  debugDamage: [Phaser.Input.Keyboard.KeyCodes.H]
+  debugDamage: [Phaser.Input.Keyboard.KeyCodes.H],
+  swap: [Phaser.Input.Keyboard.KeyCodes.Q],
 };
 
 function anyKey(keys, predicate) {

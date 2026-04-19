@@ -28,6 +28,10 @@ export class TrainingDummy {
     return this.hp > 0;
   }
 
+  canBeHit() {
+    return this.isAlive() && this.invulnTimer <= 0;
+  }
+
   getHurtbox() {
     const body = this.sprite.body;
     return {

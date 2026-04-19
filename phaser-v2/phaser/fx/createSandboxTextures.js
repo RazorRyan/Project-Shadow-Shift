@@ -63,4 +63,45 @@ export function createSandboxTextures(scene) {
     graphics.generateTexture("training-dummy", 56, 86);
     graphics.destroy();
   }
+
+  if (!scene.textures.exists("enemy-grunt")) {
+    const g = scene.make.graphics({ x: 0, y: 0, add: false });
+    // body
+    g.fillStyle(0x2a1a12, 1);
+    g.fillRoundedRect(8, 18, 24, 40, 8);
+    // head
+    g.fillStyle(0xb06850, 1);
+    g.fillCircle(20, 16, 12);
+    // eyes — hostile red
+    g.fillStyle(0xff3020, 1);
+    g.fillCircle(14, 14, 3);
+    g.fillCircle(26, 14, 3);
+    // horns
+    g.lineStyle(2, 0x7a3820, 1);
+    g.strokeLineShape(new Phaser.Geom.Line(12, 6, 7, 0));
+    g.strokeLineShape(new Phaser.Geom.Line(28, 6, 33, 0));
+    // outline
+    g.lineStyle(2, 0x7a3820, 0.9);
+    g.strokeRoundedRect(8, 18, 24, 40, 8);
+    g.generateTexture("enemy-grunt", 40, 62);
+    g.destroy();
+  }
+
+  if (!scene.textures.exists("shadow-tile")) {
+    const g = scene.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x1a0835, 1);
+    g.fillRect(0, 0, 64, 64);
+    g.fillStyle(0x6030d0, 0.18);
+    g.fillRect(0, 0, 64, 8);
+    g.fillStyle(0x4a20b0, 0.22);
+    g.fillRect(0, 56, 64, 8);
+    g.lineStyle(2, 0x9060ff, 0.55);
+    g.strokeRect(1, 1, 62, 62);
+    g.lineStyle(1, 0xc090ff, 0.18);
+    g.strokeLineShape(new Phaser.Geom.Line(16, 1, 16, 63));
+    g.strokeLineShape(new Phaser.Geom.Line(32, 1, 32, 63));
+    g.strokeLineShape(new Phaser.Geom.Line(48, 1, 48, 63));
+    g.generateTexture("shadow-tile", 64, 64);
+    g.destroy();
+  }
 }

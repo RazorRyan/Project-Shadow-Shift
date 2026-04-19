@@ -1,3 +1,5 @@
+import { loadRoom } from "./roomLoader.js";
+
 const ROOM_LAYOUTS = {
   presentation: {
     label: "Ruin Hall",
@@ -5,6 +7,9 @@ const ROOM_LAYOUTS = {
     dummySpawns: [
       { x: 920, y: 534, label: "Ruin Husk" },
       { x: 1070, y: 534, label: "Guard Shell" }
+    ],
+    enemySpawns: [
+      { x: 760, y: 534, statKey: "ruin_husk" }
     ],
     platforms: [
       { x: 0, y: 620, w: 420, h: 100 },
@@ -45,6 +50,9 @@ const ROOM_LAYOUTS = {
       { x: 870, y: 534, label: "Ruin Husk" },
       { x: 980, y: 534, label: "Guard Shell" }
     ],
+    enemySpawns: [
+      { x: 730, y: 534, statKey: "ruin_husk" }
+    ],
     platforms: [
       { x: 0, y: 620, w: 500, h: 100 },
       { x: 560, y: 620, w: 460, h: 100 },
@@ -68,6 +76,11 @@ export function getRoomLayout(mode = "presentation") {
 }
 
 export function spawnRoomLayout(scene, solids, mode = "presentation") {
+  // Phase 10: "presentation" uses the tilemap pipeline
+  if (mode === "presentation") {
+    return loadRoom(scene, solids, "ruin-hall");
+  }
+
   const layout = getRoomLayout(mode);
 
   for (const platform of layout.platforms) {
