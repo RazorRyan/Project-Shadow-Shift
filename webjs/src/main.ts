@@ -115,13 +115,32 @@ function getViewportBounds() {
   };
 }
 
+function measureTouchHudReserve(): number {
+  const touchHudEl = hud.touchHud;
+  if (!touchHudEl) return 0;
+  const rect = touchHudEl.getBoundingClientRect();
+  // Add spacing margin below the measured touch HUD height
+  const TOUCH_HUD_BOTTOM_MARGIN = 20;
+  return rect.height > 0 ? Math.round(rect.height + TOUCH_HUD_BOTTOM_MARGIN) : 0;
+}
+
+// Safety floor for touch mode (covers cases where touch HUD has not yet rendered)
+const MIN_TOUCH_RESERVE = 100;
+// Reserve below canvas for non-touch mode (accounts for padding/border only)
+const DEFAULT_BOTTOM_RESERVE = 26;
+// Delay (ms) after orientationchange so the browser updates viewport dimensions first
+const ORIENTATION_CHANGE_DELAY_MS = 150;
+
 function updateCanvasLayout() {
   const panelBounds = gamePanel.getBoundingClientRect();
   const viewport = getViewportBounds();
+  const isTouchMode = document.body.classList.contains("touch-mode") || coarsePointerQuery.matches;
   const isNarrow = viewport.width <= 920;
-  const reserveBottom = document.body.classList.contains("touch-mode") || coarsePointerQuery.matches ? 178 : 26;
+  const reserveBottom = isTouchMode ? Math.max(MIN_TOUCH_RESERVE, measureTouchHudReserve()) : DEFAULT_BOTTOM_RESERVE;
   const reserveTop = isNarrow ? 24 : 36;
-  const maxWidth = Math.max(220, panelBounds.width - 28);
+  const computedStyle = getComputedStyle(gamePanel);
+  const paddingH = parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight);
+  const maxWidth = Math.max(220, panelBounds.width - paddingH);
   const maxHeight = Math.max(220, Math.min(panelBounds.height - reserveBottom, viewport.height - reserveTop - reserveBottom));
   const scale = Math.max(0.3, Math.min(maxWidth / BASE_CANVAS_WIDTH, maxHeight / BASE_CANVAS_HEIGHT));
   const displayWidth = Math.round(BASE_CANVAS_WIDTH * scale);
@@ -303,7 +322,7 @@ if (typeof coarsePointerQuery.addEventListener === "function") {
 }
 installMobileGestureGuards();
 window.addEventListener("resize", updateCanvasLayout);
-window.addEventListener("orientationchange", updateCanvasLayout);
+window.addEventListener("orientationchange", () => setTimeout(updateCanvasLayout, ORIENTATION_CHANGE_DELAY_MS));
 window.visualViewport?.addEventListener("resize", updateCanvasLayout);
 window.visualViewport?.addEventListener("scroll", updateCanvasLayout);
 
@@ -1809,4 +1828,5 @@ const runtime = createRuntime({
 
 updateHud();
 updateCanvasLayout();
+requestAnimationFrame(updateCanvasLayout);
 runtime.start();
