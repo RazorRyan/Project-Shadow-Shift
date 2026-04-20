@@ -42,3 +42,16 @@ Use Cloudflare Pages with:
 - Root directory: `webjs`
 - Build command: `npm ci && npm run build`
 - Output directory: `dist`
+
+## Prototype slice goals included
+
+- movement and jump
+- dash
+- melee attack
+- Shadow Swap
+- Element Shift
+- one enemy
+- one Fire barrier
+- one Shadow-only platform
+- one seal pickup that opens the exit
+- one weapon upgrade pickup
