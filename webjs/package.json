@@ -1,0 +1,20 @@
+{
+  "name": "webjs",
+  "version": "1.0.0",
+  "description": "This folder contains a browser-playable prototype of `Shadow Shift`.",
+  "main": "game.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.8"
+  }
+}
