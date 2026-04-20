@@ -88,8 +88,6 @@ const audio = createAudioEngine();
 
 const keys = new Set<string>();
 const touchState = {
-  left: false,
-  right: false,
   axisX: 0,
   axisY: 0,
   targetAxisX: 0,
@@ -106,8 +104,6 @@ const joystick = {
 
 function clearInputState() {
   keys.clear();
-  touchState.left = false;
-  touchState.right = false;
   touchState.axisX = 0;
   touchState.axisY = 0;
   touchState.targetAxisX = 0;
@@ -152,7 +148,6 @@ const ORIENTATION_CHANGE_DELAY_MS = 150;
 const JOYSTICK_DEAD_ZONE = 0.18;
 const JOYSTICK_AXIS_EPSILON = 0.035;
 const JOYSTICK_SMOOTHING = 16;
-const JOYSTICK_DIRECTION_THRESHOLD = 0.32;
 const MIN_JOYSTICK_TRAVEL = 20;
 const JOYSTICK_TRAVEL_RATIO = 0.56;
 
@@ -220,8 +215,6 @@ function remapDeadZone(value: number) {
 function setJoystickTarget(targetX: number, targetY: number) {
   touchState.targetAxisX = remapDeadZone(clamp(targetX, -1, 1));
   touchState.targetAxisY = remapDeadZone(clamp(targetY, -1, 1));
-  touchState.left = touchState.targetAxisX < -JOYSTICK_DIRECTION_THRESHOLD;
-  touchState.right = touchState.targetAxisX > JOYSTICK_DIRECTION_THRESHOLD;
 }
 
 function updateJoystickFromPointer(clientX: number, clientY: number) {
@@ -245,7 +238,7 @@ function updateJoystickFromPointer(clientX: number, clientY: number) {
 }
 
 function updateTouchMovementInput(dt: number) {
-  // Exponential smoothing yields quick response while damping jitter from touch drift.
+  // Exponential smoothing yields quick response while damping jitter from touch micro-movements.
   const blend = 1 - Math.exp(-JOYSTICK_SMOOTHING * dt);
   touchState.axisX += (touchState.targetAxisX - touchState.axisX) * blend;
   touchState.axisY += (touchState.targetAxisY - touchState.axisY) * blend;
@@ -1545,8 +1538,7 @@ function updatePlayer(dt) {
 function getMoveAxis() {
   const keyboardAxis = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0)
     - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
-  if (keyboardAxis !== 0) return keyboardAxis;
-  return touchState.axisX;
+  return clamp(keyboardAxis + touchState.axisX, -1, 1);
 }
 
 function getPlayerGravity(player, movement = getMovementTuning(state, player)) {
