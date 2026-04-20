@@ -152,6 +152,9 @@ const ORIENTATION_CHANGE_DELAY_MS = 150;
 const JOYSTICK_DEAD_ZONE = 0.18;
 const JOYSTICK_AXIS_EPSILON = 0.035;
 const JOYSTICK_SMOOTHING = 16;
+const JOYSTICK_DIRECTION_THRESHOLD = 0.32;
+const MIN_JOYSTICK_TRAVEL = 20;
+const JOYSTICK_TRAVEL_RATIO = 0.56;
 
 function updateCanvasLayout() {
   const panelBounds = gamePanel.getBoundingClientRect();
@@ -217,8 +220,8 @@ function remapDeadZone(value: number) {
 function setJoystickTarget(targetX: number, targetY: number) {
   touchState.targetAxisX = remapDeadZone(clamp(targetX, -1, 1));
   touchState.targetAxisY = remapDeadZone(clamp(targetY, -1, 1));
-  touchState.left = touchState.targetAxisX < -0.32;
-  touchState.right = touchState.targetAxisX > 0.32;
+  touchState.left = touchState.targetAxisX < -JOYSTICK_DIRECTION_THRESHOLD;
+  touchState.right = touchState.targetAxisX > JOYSTICK_DIRECTION_THRESHOLD;
 }
 
 function updateJoystickFromPointer(clientX: number, clientY: number) {
@@ -227,7 +230,7 @@ function updateJoystickFromPointer(clientX: number, clientY: number) {
   const centerX = rect.left + rect.width * 0.5;
   const centerY = rect.top + rect.height * 0.5;
   const radius = Math.min(rect.width, rect.height) * 0.5;
-  const maxTravel = Math.max(20, radius * 0.56);
+  const maxTravel = Math.max(MIN_JOYSTICK_TRAVEL, radius * JOYSTICK_TRAVEL_RATIO);
   const rawX = clientX - centerX;
   const rawY = clientY - centerY;
   const distance = Math.hypot(rawX, rawY);
@@ -242,6 +245,7 @@ function updateJoystickFromPointer(clientX: number, clientY: number) {
 }
 
 function updateTouchMovementInput(dt: number) {
+  // Exponential smoothing yields quick response while damping jitter from touch drift.
   const blend = 1 - Math.exp(-JOYSTICK_SMOOTHING * dt);
   touchState.axisX += (touchState.targetAxisX - touchState.axisX) * blend;
   touchState.axisY += (touchState.targetAxisY - touchState.axisY) * blend;
