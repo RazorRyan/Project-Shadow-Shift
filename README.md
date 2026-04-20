@@ -32,7 +32,7 @@ The **TypeScript engine in `webjs/src`** is the only official production build a
 ## Run the TypeScript game locally
 
 ```bash
-cd /home/runner/work/Project-Shadow-Shift/Project-Shadow-Shift/webjs
+cd webjs
 npm ci
 npm run dev
 ```
@@ -42,19 +42,17 @@ Vite will start a local dev server for the TypeScript version.
 ## Build the TypeScript version
 
 ```bash
-cd /home/runner/work/Project-Shadow-Shift/Project-Shadow-Shift/webjs
+cd webjs
 npm ci
 npm run build
 ```
 
-Build output is generated in:
-
-`/home/runner/work/Project-Shadow-Shift/Project-Shadow-Shift/webjs/dist`
+Build output is generated in `webjs/dist`.
 
 ## Preview the production build
 
 ```bash
-cd /home/runner/work/Project-Shadow-Shift/Project-Shadow-Shift/webjs
+cd webjs
 npm run preview
 ```
 
