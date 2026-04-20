@@ -46,6 +46,7 @@ import {
 // ---------------------------------------------------------------------------
 
 const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
+const gamePanel = document.getElementById("gamePanel") as HTMLElement;
 canvas.width = BASE_CANVAS_WIDTH;
 canvas.height = BASE_CANVAS_HEIGHT;
 const ctx = canvas.getContext("2d", { alpha: false }) as CanvasRenderingContext2D;
@@ -88,6 +89,7 @@ const audio = createAudioEngine();
 const keys = new Set<string>();
 const touchState = { left: false, right: false };
 const touchButtons = Array.from(document.querySelectorAll("[data-touch], [data-touch-tap]"));
+const coarsePointerQuery = window.matchMedia("(hover: none) and (pointer: coarse)");
 
 function clearInputState() {
   keys.clear();
@@ -103,6 +105,57 @@ function clearInputState() {
 
 function setTouchMode(enabled: boolean) {
   document.body.classList.toggle("touch-mode", enabled);
+}
+
+function getViewportBounds() {
+  const viewport = window.visualViewport;
+  return {
+    width: viewport?.width ?? window.innerWidth,
+    height: viewport?.height ?? window.innerHeight
+  };
+}
+
+function updateCanvasLayout() {
+  const panelBounds = gamePanel.getBoundingClientRect();
+  const viewport = getViewportBounds();
+  const isNarrow = viewport.width <= 920;
+  const reserveBottom = document.body.classList.contains("touch-mode") || coarsePointerQuery.matches ? 178 : 26;
+  const reserveTop = isNarrow ? 24 : 36;
+  const maxWidth = Math.max(220, panelBounds.width - 28);
+  const maxHeight = Math.max(220, Math.min(panelBounds.height - reserveBottom, viewport.height - reserveTop - reserveBottom));
+  const scale = Math.max(0.3, Math.min(maxWidth / BASE_CANVAS_WIDTH, maxHeight / BASE_CANVAS_HEIGHT));
+  const displayWidth = Math.round(BASE_CANVAS_WIDTH * scale);
+  const displayHeight = Math.round(BASE_CANVAS_HEIGHT * scale);
+  canvas.style.width = `${displayWidth}px`;
+  canvas.style.height = `${displayHeight}px`;
+}
+
+function installMobileGestureGuards() {
+  const stopGesture = (event: Event) => {
+    if (event.cancelable) event.preventDefault();
+  };
+  for (const gestureEvent of ["gesturestart", "gesturechange", "gestureend"]) {
+    document.addEventListener(gestureEvent, stopGesture, { passive: false });
+  }
+  window.addEventListener("wheel", (event) => {
+    if (event.ctrlKey && event.cancelable) event.preventDefault();
+  }, { passive: false });
+  document.addEventListener("touchmove", (event) => {
+    const target = event.target as Node | null;
+    if (!target) return;
+    if ((gamePanel.contains(target) || hud.touchHud?.contains(target)) && event.cancelable) {
+      event.preventDefault();
+    }
+  }, { passive: false });
+}
+
+function syncTouchModeFromDevice() {
+  if (coarsePointerQuery.matches) setTouchMode(true);
+}
+
+function releaseMovementControl(control: "left" | "right", button: HTMLElement) {
+  touchState[control] = false;
+  button.classList.remove("is-active");
 }
 
 window.addEventListener("keydown", (event) => {
@@ -173,44 +226,86 @@ hud.invulnerableToggleButton!.addEventListener("click", () => {
 });
 
 for (const button of document.querySelectorAll("[data-touch]")) {
-  const control = (button as HTMLElement).dataset.touch!;
-  const press = (event: Event) => {
+  const control = (button as HTMLElement).dataset.touch as "left" | "right";
+  let activePointerId: number | null = null;
+
+  const press = (event: PointerEvent) => {
+    if (activePointerId !== null) return;
     event.preventDefault();
     setTouchMode(true);
     audio.ensureAudio();
     if (!state.started) { startRun(); }
-    (touchState as any)[control] = true;
+    activePointerId = event.pointerId;
+    (button as HTMLElement).setPointerCapture(event.pointerId);
+    touchState[control] = true;
     (button as HTMLElement).classList.add("is-active");
   };
-  const release = (event: Event) => {
+
+  const release = (event: PointerEvent) => {
+    if (activePointerId !== event.pointerId) return;
     event.preventDefault();
-    (touchState as any)[control] = false;
-    (button as HTMLElement).classList.remove("is-active");
+    activePointerId = null;
+    releaseMovementControl(control, button as HTMLElement);
+    if ((button as HTMLElement).hasPointerCapture(event.pointerId)) {
+      (button as HTMLElement).releasePointerCapture(event.pointerId);
+    }
   };
+
   button.addEventListener("pointerdown", press);
   button.addEventListener("pointerup", release);
   button.addEventListener("pointercancel", release);
-  button.addEventListener("pointerleave", release);
+  button.addEventListener("lostpointercapture", () => {
+    if (activePointerId === null) return;
+    activePointerId = null;
+    releaseMovementControl(control, button as HTMLElement);
+  });
 }
 
 for (const button of document.querySelectorAll("[data-touch-tap]")) {
   const action = (button as HTMLElement).dataset.touchTap!;
-  button.addEventListener("pointerdown", (event) => {
+  let activePointerId: number | null = null;
+
+  button.addEventListener("pointerdown", (event: PointerEvent) => {
+    if (activePointerId !== null) return;
     event.preventDefault();
     setTouchMode(true);
     audio.ensureAudio();
+    activePointerId = event.pointerId;
+    (button as HTMLElement).setPointerCapture(event.pointerId);
     if (!state.started) { startRun(); return; }
     (button as HTMLElement).classList.add("is-active");
     handleTouchAction(action);
   });
-  const clear = (event: Event) => {
+
+  const clear = (event: PointerEvent) => {
+    if (activePointerId !== event.pointerId) return;
     event.preventDefault();
+    activePointerId = null;
     (button as HTMLElement).classList.remove("is-active");
+    if ((button as HTMLElement).hasPointerCapture(event.pointerId)) {
+      (button as HTMLElement).releasePointerCapture(event.pointerId);
+    }
   };
+
   button.addEventListener("pointerup", clear);
   button.addEventListener("pointercancel", clear);
-  button.addEventListener("pointerleave", clear);
+  button.addEventListener("lostpointercapture", () => {
+    activePointerId = null;
+    (button as HTMLElement).classList.remove("is-active");
+  });
 }
+
+syncTouchModeFromDevice();
+if (typeof coarsePointerQuery.addEventListener === "function") {
+  coarsePointerQuery.addEventListener("change", syncTouchModeFromDevice);
+} else {
+  coarsePointerQuery.addListener(syncTouchModeFromDevice);
+}
+installMobileGestureGuards();
+window.addEventListener("resize", updateCanvasLayout);
+window.addEventListener("orientationchange", updateCanvasLayout);
+window.visualViewport?.addEventListener("resize", updateCanvasLayout);
+window.visualViewport?.addEventListener("scroll", updateCanvasLayout);
 
 // ---------------------------------------------------------------------------
 // Game state — created from the current level definition
@@ -638,7 +733,7 @@ function handleTouchAction(action) {
   if (action === "attack") { tryAttack(); return; }
   if (action === "dash") { if (state.abilityUnlocked.Dash) tryDash(); return; }
   if (action === "swap") { if (state.abilityUnlocked.ShadowSwap) performWorldSwap(state); return; }
-  if (action === "rest") { tryRestAtCheckpoint(); return; }
+  if (action === "interact" || action === "rest") { tryRestAtCheckpoint(); return; }
   if (action === "element") cycleElement();
 }
 
@@ -677,6 +772,7 @@ function startRun() {
   spawnPlayerAtCheckpoint(state, state.player, "start");
   regenerateProceduralLayout(state);
   announceProgressionRoute(state, true);
+  updateCanvasLayout();
 }
 
 function showDeathOverlay(reason) {
@@ -1647,7 +1743,9 @@ function updateHud() {
     hud.objective!.textContent = "Defeat the Eclipse Lord";
   } else if (state.nearbyCheckpointId) {
     const checkpoint = getCheckpointById(state, state.nearbyCheckpointId);
-    hud.objective!.textContent = `Press R to rest at ${checkpoint.label}`;
+    hud.objective!.textContent = document.body.classList.contains("touch-mode")
+      ? `Tap Interact to rest at ${checkpoint.label}`
+      : `Press R to rest at ${checkpoint.label}`;
   } else if (currentRoute) {
     hud.objective!.textContent = currentRoute.roomId === currentRoom.id
       ? currentRoute.objective
@@ -1710,4 +1808,5 @@ const runtime = createRuntime({
 });
 
 updateHud();
+updateCanvasLayout();
 runtime.start();
