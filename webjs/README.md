@@ -1,29 +1,49 @@
-# Shadow Shift Web
+# Shadow Shift Web (TypeScript Production Target)
 
-This folder contains a browser-playable prototype of `Shadow Shift`.
+This directory is the official web production target for Shadow Shift.
 
-How to run:
+## Source of truth
 
-1. Open `index.html` in a browser
+- **Production source:** `src/` (TypeScript)
+- **Production entrypoint:** `src/main.ts` via `index.html`
+- **Production build system:** Vite
+- **Production output:** `dist/`
 
-If your browser blocks local script loading, use a tiny local server instead:
+## Legacy/reference code
 
-- Python: `python -m http.server 8080`
-- Then visit: `http://localhost:8080`
+- `game.js`
+- `engine/*.js`
 
-Controls:
+These JavaScript files are legacy/reference artifacts and are **not** the official deployment target.
 
-- `A` / `D`: move
-- `Space`: jump
-- `Shift`: dash
-- `F`: attack
-- `E`: swap Light / Shadow world
-- `1`: Fire
-- `2`: Ice
-- `3`: Wind
-- `0`: clear element
+## Local development (TypeScript)
 
-Prototype slice goals included:
+```bash
+npm ci
+npm run dev
+```
+
+## Production build (TypeScript)
+
+```bash
+npm run build
+```
+
+## Preview production build
+
+```bash
+npm run preview
+```
+
+## Cloudflare Pages target
+
+Use Cloudflare Pages with:
+
+- Root directory: `webjs`
+- Build command: `npm ci && npm run build`
+- Output directory: `dist`
+
+## Prototype slice goals included
 
 - movement and jump
 - dash

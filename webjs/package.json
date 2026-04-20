@@ -1,12 +1,11 @@
 {
   "name": "webjs",
   "version": "1.0.0",
-  "description": "This folder contains a browser-playable prototype of `Shadow Shift`.",
-  "main": "game.js",
+  "description": "Shadow Shift web production build (TypeScript + Vite).",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "vite --config vite.config.ts",
+    "build": "vite build --config vite.config.ts",
+    "preview": "vite preview --config vite.config.ts"
   },
   "keywords": [],
   "author": "",
