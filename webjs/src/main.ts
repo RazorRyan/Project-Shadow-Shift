@@ -130,17 +130,7 @@ function getViewportBounds() {
   };
 }
 
-function measureTouchHudReserve(): number {
-  const touchHudEl = hud.touchHud;
-  if (!touchHudEl) return 0;
-  const rect = touchHudEl.getBoundingClientRect();
-  // Add spacing margin below the measured touch HUD height
-  const TOUCH_HUD_BOTTOM_MARGIN = 20;
-  return rect.height > 0 ? Math.round(rect.height + TOUCH_HUD_BOTTOM_MARGIN) : 0;
-}
 
-// Safety floor for touch mode (covers cases where touch HUD has not yet rendered)
-const MIN_TOUCH_RESERVE = 100;
 // Reserve below canvas for non-touch mode (accounts for padding/border only)
 const DEFAULT_BOTTOM_RESERVE = 26;
 // Delay (ms) after orientationchange so the browser updates viewport dimensions first
@@ -157,9 +147,9 @@ function updateCanvasLayout() {
   const isTouchMode = document.body.classList.contains("touch-mode") || coarsePointerQuery.matches;
   const isNarrow = viewport.width <= 920;
   const isLandscape = viewport.width > viewport.height;
-  const baseReserveBottom = isTouchMode ? Math.max(MIN_TOUCH_RESERVE, measureTouchHudReserve()) : DEFAULT_BOTTOM_RESERVE;
-  const reserveBottom = isTouchMode && isLandscape ? Math.max(76, Math.round(baseReserveBottom * 0.78)) : baseReserveBottom;
-  const reserveTop = isTouchMode && isLandscape ? 10 : (isNarrow ? 24 : 36);
+  const baseReserveBottom = isTouchMode ? 0 : DEFAULT_BOTTOM_RESERVE;
+  const reserveBottom = baseReserveBottom;
+  const reserveTop = isTouchMode ? 0 : (isNarrow ? 24 : 36);
   const computedStyle = getComputedStyle(gamePanel);
   const paddingH = parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight);
   const paddingV = parseFloat(computedStyle.paddingTop) + parseFloat(computedStyle.paddingBottom);
@@ -1483,7 +1473,7 @@ function updatePlayer(dt) {
 
   const moveAxis = getMoveAxis();
   player.moveAxis = moveAxis;
-  if (moveAxis !== 0) player.facing = moveAxis;
+  if (moveAxis !== 0) player.facing = Math.sign(moveAxis);
 
   if (player.dashTimer > 0) {
     player.dashTimer -= dt;

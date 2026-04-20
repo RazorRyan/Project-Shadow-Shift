@@ -536,7 +536,7 @@ body.touch-mode .game-panel {
 }
 
 body.touch-mode canvas {
-  border-radius: 16px;
+  border-radius: 0;
 }
 
 @media (max-width: 1080px) {
