@@ -347,58 +347,110 @@ canvas {
 
 .touch-hud {
   position: absolute;
-   inset: auto 18px max(18px, env(safe-area-inset-bottom)) 18px;
+  inset: auto max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   display: none;
   justify-content: space-between;
   align-items: end;
-  gap: 16px;
+  gap: 18px;
   pointer-events: none;
 }
 
 .touch-cluster {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   pointer-events: auto;
 }
 
 .touch-actions {
+  gap: 10px;
   flex-wrap: wrap;
   justify-content: end;
-  max-width: min(58vw, 360px);
+  max-width: min(54vw, 332px);
+}
+
+.touch-move {
+  align-items: end;
+}
+
+.touch-joystick {
+  width: 132px;
+  height: 132px;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+.touch-joystick-base {
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(220, 231, 255, 0.2);
+  background:
+    radial-gradient(circle at 35% 30%, rgba(221, 229, 248, 0.16), rgba(59, 66, 86, 0.14) 48%, rgba(11, 14, 24, 0.22) 100%),
+    rgba(8, 11, 19, 0.2);
+  box-shadow: inset 0 2px 14px rgba(0, 0, 0, 0.3);
+  opacity: 0.36;
+  transition: opacity 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+
+.touch-joystick-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1px solid rgba(231, 238, 255, 0.28);
+  background:
+    radial-gradient(circle at 32% 28%, rgba(244, 248, 255, 0.28), rgba(123, 135, 175, 0.18) 60%, rgba(13, 16, 26, 0.34)),
+    rgba(17, 22, 34, 0.3);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+  transform: translate3d(var(--joy-x, 0px), var(--joy-y, 0px), 0);
+  transition: transform 70ms linear;
+}
+
+.touch-joystick.is-active .touch-joystick-base {
+  opacity: 0.58;
+  border-color: rgba(227, 236, 255, 0.34);
 }
 
 .touch-button {
-  min-width: 68px;
-  min-height: 68px;
-  padding: 12px 14px;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  min-width: 56px;
+  min-height: 56px;
+  padding: 8px 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(227, 236, 255, 0.16);
   background:
-    linear-gradient(180deg, rgba(247, 240, 226, 0.16), rgba(89, 84, 96, 0.24)),
-    rgba(14, 17, 26, 0.72);
+    linear-gradient(180deg, rgba(247, 240, 226, 0.08), rgba(89, 84, 96, 0.1)),
+    rgba(14, 17, 26, 0.44);
   color: var(--text);
   font: inherit;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.74;
   touch-action: manipulation;
   user-select: none;
   -webkit-user-select: none;
+  backdrop-filter: blur(2px);
+  transition: opacity 120ms ease, background-color 120ms ease, transform 100ms ease;
 }
 
 .touch-wide {
-  min-width: 90px;
+  min-width: 72px;
 }
 
 .touch-jump {
-  min-width: 96px;
+  min-width: 80px;
 }
 
 .touch-button:active,
 .touch-button.is-active {
   transform: translateY(1px) scale(0.98);
+  opacity: 0.94;
   background:
-    linear-gradient(180deg, rgba(247, 240, 226, 0.24), rgba(111, 123, 199, 0.26)),
-    rgba(18, 23, 34, 0.86);
+    linear-gradient(180deg, rgba(247, 240, 226, 0.2), rgba(111, 123, 199, 0.18)),
+    rgba(18, 23, 34, 0.72);
 }
 
 .hidden {
@@ -419,7 +471,28 @@ body.touch-mode .brand-lockup {
 
 body.touch-mode .screen-overlay,
 body.touch-mode .death-overlay {
-  inset: 12px 12px calc(104px + env(safe-area-inset-bottom)) 12px;
+  inset: 10px max(10px, env(safe-area-inset-right)) calc(92px + env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+
+body.touch-mode .app {
+  grid-template-columns: 1fr;
+}
+
+body.touch-mode .hud-panel {
+  display: none;
+}
+
+body.touch-mode .game-panel {
+  min-height: 100dvh;
+  padding:
+    max(8px, env(safe-area-inset-top))
+    max(8px, env(safe-area-inset-right))
+    max(8px, env(safe-area-inset-bottom))
+    max(8px, env(safe-area-inset-left));
+}
+
+body.touch-mode canvas {
+  border-radius: 16px;
 }
 
 @media (max-width: 1080px) {
@@ -517,27 +590,29 @@ body.touch-mode .death-overlay {
 }
 
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
-  .app {
-    grid-template-columns: 200px 1fr;
-    align-items: stretch;
-  }
-
-  .hud-panel {
-    max-height: 100dvh;
-    border-right: 1px solid var(--panel-border);
-    border-bottom: 0;
-  }
-
   .game-panel {
-    order: 0;
     min-height: 100dvh;
-    padding-top: 12px;
+    padding-top: max(8px, env(safe-area-inset-top));
+  }
+
+  .touch-hud {
+    inset: auto max(20px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    gap: 22px;
+  }
+
+  .touch-joystick {
+    width: 136px;
+    height: 136px;
+  }
+
+  .touch-actions {
+    max-width: min(48vw, 332px);
   }
 }
 
 @media (max-width: 560px) {
   .touch-hud {
-    inset: auto 10px 10px 10px;
+    inset: auto max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
     gap: 10px;
   }
 
@@ -546,36 +621,56 @@ body.touch-mode .death-overlay {
   }
 
   .touch-actions {
-    max-width: min(66vw, 296px);
+    max-width: min(62vw, 284px);
   }
 
-  .touch-button {
-    min-width: 58px;
-    min-height: 58px;
-    border-radius: 18px;
-    font-size: 0.82rem;
-    padding: 10px 12px;
+  .touch-joystick {
+    width: 112px;
+    height: 112px;
   }
 
-  .touch-jump {
-    min-width: 82px;
+  .touch-joystick-thumb {
+    width: 48px;
+    height: 48px;
   }
-}
 
-@media (max-width: 420px) {
   .touch-button {
     min-width: 52px;
     min-height: 52px;
     border-radius: 16px;
-    font-size: 0.76rem;
+    font-size: 0.68rem;
+    padding: 8px 10px;
+  }
+
+  .touch-jump {
+    min-width: 70px;
+  }
+}
+
+@media (max-width: 420px) {
+  .touch-joystick {
+    width: 98px;
+    height: 98px;
+  }
+
+  .touch-joystick-thumb {
+    width: 40px;
+    height: 40px;
+  }
+
+  .touch-button {
+    min-width: 48px;
+    min-height: 48px;
+    border-radius: 14px;
+    font-size: 0.64rem;
     padding: 8px 10px;
   }
 
   .touch-wide {
-    min-width: 58px;
+    min-width: 54px;
   }
 
   .touch-jump {
-    min-width: 58px;
+    min-width: 60px;
   }
 }

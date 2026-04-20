@@ -62,8 +62,11 @@
       <canvas id="gameCanvas" width="1280" height="720" aria-label="Shadow Shift game view"></canvas>
       <div id="touchHud" class="touch-hud" aria-label="Touch controls">
         <div class="touch-cluster touch-move">
-          <button class="touch-button touch-wide" data-touch="left" aria-label="Move left">Left</button>
-          <button class="touch-button touch-wide" data-touch="right" aria-label="Move right">Right</button>
+          <div id="touchJoystick" class="touch-joystick" aria-label="Movement joystick">
+            <div id="touchJoystickBase" class="touch-joystick-base">
+              <div id="touchJoystickThumb" class="touch-joystick-thumb"></div>
+            </div>
+          </div>
         </div>
         <div class="touch-cluster touch-actions">
           <button class="touch-button touch-jump" data-touch-tap="jump" aria-label="Jump">Jump</button>
@@ -112,4 +115,3 @@
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
-

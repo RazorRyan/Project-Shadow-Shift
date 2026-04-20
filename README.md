@@ -88,7 +88,7 @@ This ensures deployment always uses the active TypeScript version.
 
 ### Touch (Mobile)
 
-- **Left / Right buttons** — Move
+- **Virtual joystick (left thumb)** — Move (with dead zone + smoothing)
 - **Jump** — Jump
 - **Attack** — Melee strike
 - **Dash** — Dash
@@ -96,7 +96,20 @@ This ensures deployment always uses the active TypeScript version.
 - **Interact** — Rest/use shrine interaction
 - **Element** — Cycle unlocked element stance
 
-The mobile HUD is optimized for coarse touch input and keeps keyboard controls intact for desktop play.
+The mobile HUD is tuned for landscape phone gameplay with subtle, semi-transparent controls and keeps keyboard controls intact for desktop play.
+
+## 📱 Mobile Landscape UX Notes
+
+- Landscape mobile play is treated as first-class in the active TypeScript build.
+- Touch mode prioritizes immersive gameplay area sizing with safe-area-aware spacing (including notches and browser insets).
+- On modern phones (including Samsung Galaxy S25-class displays), the canvas scales to near full-screen in landscape while preserving aspect ratio.
+- Movement now uses a left-side virtual joystick (base + thumb), while action buttons stay on the right for multitouch play.
+- Gesture guards reduce browser interference (scrolling, pinch/zoom, and selection) during gameplay.
+
+### Known mobile browser limitations
+
+- Some mobile browsers delay true fullscreen behavior until user interaction and may keep minimal system UI visible.
+- Dynamic browser bars can still cause slight viewport size shifts during long sessions; layout handlers react to reduce impact.
 
 ## 🕹 Gameplay Overview
 
