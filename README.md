@@ -100,10 +100,10 @@ The mobile HUD is tuned for landscape phone gameplay with subtle, semi-transpare
 
 ## 📱 Mobile Landscape UX Notes
 
-- Landscape mobile play is treated as first-class in the active TypeScript build.
+- Landscape mobile play is treated as first-class in the current implementation.
 - Touch mode prioritizes immersive gameplay area sizing with safe-area-aware spacing (including notches and browser insets).
 - On modern phones (including Samsung Galaxy S25-class displays), the canvas scales to near full-screen in landscape while preserving aspect ratio.
-- Movement now uses a left-side virtual joystick (base + thumb), while action buttons stay on the right for multitouch play.
+- Movement uses a left-side virtual joystick (base + thumb), while the right side has an ABXY diamond facepad for actions.
 - Gesture guards reduce browser interference (scrolling, pinch/zoom, and selection) during gameplay.
 
 ### Known mobile browser limitations

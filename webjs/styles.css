@@ -402,7 +402,7 @@ canvas {
 }
 
 /* Subtle ABXY color hints — matches the game's dark palette */
-.facepad-a { border-color: rgba(90, 210, 130, 0.3);  color: rgba(140, 230, 168, 0.92); }
+.facepad-a { border-color: rgba(90, 210, 130, 0.3); color: rgba(140, 230, 168, 0.92); }
 .facepad-b { border-color: rgba(230, 100, 100, 0.3); color: rgba(245, 148, 148, 0.92); }
 .facepad-x { border-color: rgba(100, 160, 240, 0.3); color: rgba(148, 192, 248, 0.92); }
 .facepad-y { border-color: rgba(240, 212, 80, 0.3);  color: rgba(245, 224, 132, 0.92); }
