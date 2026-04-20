@@ -6,46 +6,16 @@ param(
 $ErrorActionPreference = "Stop"
 
 $webRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
-$url = "http://localhost:$Port/"
+Set-Location $webRoot
 
-if (-not (Test-Path $webRoot)) {
-  throw "Web folder not found at '$webRoot'."
-}
-
-$existingListener = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
-  Select-Object -First 1
-
-if ($existingListener) {
-  Write-Host "Shadow Shift web app is already running on $url" -ForegroundColor Yellow
-} else {
-  Write-Host "Starting Shadow Shift web app on $url" -ForegroundColor Cyan
-  $process = Start-Process python `
-    -ArgumentList @("-m", "http.server", $Port) `
-    -WorkingDirectory $webRoot `
-    -WindowStyle Hidden `
-    -PassThru
-
-  $verified = $false
-  for ($attempt = 0; $attempt -lt 15; $attempt++) {
-    Start-Sleep -Milliseconds 400
-    try {
-      $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 2
-      if ($response.StatusCode -eq 200) {
-        $verified = $true
-        break
-      }
-    } catch { }
-  }
-
-  if (-not $verified) {
-    throw "Server process started but did not respond on $url"
-  }
-
-  Write-Host "Server started (PID: $($process.Id)). Press Ctrl+C in that window to stop." -ForegroundColor Green
+if (-not (Test-Path "$webRoot\package.json")) {
+  throw "package.json not found in '$webRoot'."
 }
 
 if (-not $NoBrowser) {
-  Start-Process $url
+  Start-Sleep -Milliseconds 800
+  Start-Process "http://localhost:$Port/"
 }
 
-Write-Host "Open $url to play." -ForegroundColor Green
+Write-Host "Starting Shadow Shift TypeScript dev server on http://localhost:$Port" -ForegroundColor Cyan
+npm run dev -- --host 0.0.0.0 --port $Port

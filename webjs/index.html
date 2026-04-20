@@ -58,7 +58,7 @@
         <p><span class="chip fire"></span> Fire can burn barriers</p>
       </div>
     </section>
-    <section class="game-panel">
+    <section id="gamePanel" class="game-panel">
       <canvas id="gameCanvas" width="1280" height="720" aria-label="Shadow Shift game view"></canvas>
       <div id="touchHud" class="touch-hud" aria-label="Touch controls">
         <div class="touch-cluster touch-move">
@@ -70,7 +70,7 @@
           <button class="touch-button" data-touch-tap="attack" aria-label="Attack">Attack</button>
           <button class="touch-button" data-touch-tap="dash" aria-label="Dash">Dash</button>
           <button class="touch-button" data-touch-tap="swap" aria-label="Shadow swap">Swap</button>
-          <button class="touch-button" data-touch-tap="rest" aria-label="Rest at shrine">Rest</button>
+          <button class="touch-button" data-touch-tap="interact" aria-label="Interact">Interact</button>
           <button class="touch-button" data-touch-tap="element" aria-label="Cycle element">Element</button>
         </div>
       </div>
@@ -112,5 +112,4 @@
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
-
 

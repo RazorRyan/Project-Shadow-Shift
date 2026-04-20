@@ -11,10 +11,12 @@ This directory is the official web production target for Shadow Shift.
 
 ## Legacy/reference code
 
-- `game.js`
-- `engine/*.js`
+Legacy JavaScript files have been archived to:
 
-These JavaScript files are legacy/reference artifacts and are **not** the official deployment target.
+- `../archive/legacy-js/webjs/game.js`
+- `../archive/legacy-js/webjs/engine/*.js`
+
+They are preserved for historical reference only and are **not** part of the active build/run path.
 
 ## Local development (TypeScript)
 

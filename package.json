@@ -1,0 +1,10 @@
+{
+  "name": "project-shadow-shift-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix webjs ci && npm --prefix webjs run build",
+    "dev": "npm --prefix webjs run dev"
+  },
+  "type": "commonjs"
+}
