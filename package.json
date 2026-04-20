@@ -4,7 +4,12 @@
   "private": true,
   "scripts": {
     "build": "npm --prefix webjs ci && npm --prefix webjs run build",
-    "dev": "npm --prefix webjs run dev"
+    "dev": "npm --prefix webjs run dev",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
-  "type": "commonjs"
+  "type": "commonjs",
+  "devDependencies": {
+    "wrangler": "^4.84.0"
+  }
 }

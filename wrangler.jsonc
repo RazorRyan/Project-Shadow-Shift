@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "projectshadowshift",
+  "compatibility_date": "2026-04-20",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": "phaser-v2"
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+}
