@@ -528,15 +528,13 @@ body.touch-mode .hud-panel {
 
 body.touch-mode .game-panel {
   min-height: 100dvh;
-  padding:
-    max(8px, env(safe-area-inset-top))
-    max(8px, env(safe-area-inset-right))
-    max(8px, env(safe-area-inset-bottom))
-    max(8px, env(safe-area-inset-left));
+  padding: 0;
 }
 
 body.touch-mode canvas {
   border-radius: 0;
+  max-height: 100dvh;
+  max-width: 100vw;
 }
 
 @media (max-width: 1080px) {
