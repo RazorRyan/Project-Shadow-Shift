@@ -87,17 +87,32 @@ const audio = createAudioEngine();
 // ---------------------------------------------------------------------------
 
 const keys = new Set<string>();
-const touchState = { left: false, right: false };
+const touchState = {
+  axisX: 0,
+  axisY: 0,
+  targetAxisX: 0,
+  targetAxisY: 0,
+  joystickPointerId: null as number | null
+};
 const touchButtons = Array.from(document.querySelectorAll("[data-touch], [data-touch-tap]"));
 const coarsePointerQuery = window.matchMedia("(hover: none) and (pointer: coarse)");
+const joystick = {
+  zone: document.getElementById("touchJoystick"),
+  base: document.getElementById("touchJoystickBase"),
+  thumb: document.getElementById("touchJoystickThumb")
+};
 
 function clearInputState() {
   keys.clear();
-  touchState.left = false;
-  touchState.right = false;
+  touchState.axisX = 0;
+  touchState.axisY = 0;
+  touchState.targetAxisX = 0;
+  touchState.targetAxisY = 0;
+  touchState.joystickPointerId = null;
   if (typeof state !== "undefined" && state.player) {
     state.player.jumpReleased = false;
   }
+  resetJoystickVisual();
   for (const button of touchButtons) {
     (button as HTMLElement).classList.remove("is-active");
   }
@@ -115,33 +130,34 @@ function getViewportBounds() {
   };
 }
 
-function measureTouchHudReserve(): number {
-  const touchHudEl = hud.touchHud;
-  if (!touchHudEl) return 0;
-  const rect = touchHudEl.getBoundingClientRect();
-  // Add spacing margin below the measured touch HUD height
-  const TOUCH_HUD_BOTTOM_MARGIN = 20;
-  return rect.height > 0 ? Math.round(rect.height + TOUCH_HUD_BOTTOM_MARGIN) : 0;
-}
 
-// Safety floor for touch mode (covers cases where touch HUD has not yet rendered)
-const MIN_TOUCH_RESERVE = 100;
 // Reserve below canvas for non-touch mode (accounts for padding/border only)
 const DEFAULT_BOTTOM_RESERVE = 26;
 // Delay (ms) after orientationchange so the browser updates viewport dimensions first
 const ORIENTATION_CHANGE_DELAY_MS = 150;
+const JOYSTICK_DEAD_ZONE = 0.18;
+const JOYSTICK_AXIS_EPSILON = 0.035;
+const JOYSTICK_SMOOTHING = 16;
+const MIN_JOYSTICK_TRAVEL = 20;
+const JOYSTICK_TRAVEL_RATIO = 0.56;
 
 function updateCanvasLayout() {
   const panelBounds = gamePanel.getBoundingClientRect();
   const viewport = getViewportBounds();
   const isTouchMode = document.body.classList.contains("touch-mode") || coarsePointerQuery.matches;
   const isNarrow = viewport.width <= 920;
-  const reserveBottom = isTouchMode ? Math.max(MIN_TOUCH_RESERVE, measureTouchHudReserve()) : DEFAULT_BOTTOM_RESERVE;
-  const reserveTop = isNarrow ? 24 : 36;
+  const isLandscape = viewport.width > viewport.height;
+  const baseReserveBottom = isTouchMode ? 0 : DEFAULT_BOTTOM_RESERVE;
+  const reserveBottom = baseReserveBottom;
+  const reserveTop = isTouchMode ? 0 : (isNarrow ? 24 : 36);
   const computedStyle = getComputedStyle(gamePanel);
   const paddingH = parseFloat(computedStyle.paddingLeft) + parseFloat(computedStyle.paddingRight);
+  const paddingV = parseFloat(computedStyle.paddingTop) + parseFloat(computedStyle.paddingBottom);
   const maxWidth = Math.max(220, panelBounds.width - paddingH);
-  const maxHeight = Math.max(220, Math.min(panelBounds.height - reserveBottom, viewport.height - reserveTop - reserveBottom));
+  const maxHeight = Math.max(
+    220,
+    Math.min(panelBounds.height - paddingV - reserveBottom, viewport.height - reserveTop - reserveBottom)
+  );
   const scale = Math.max(0.3, Math.min(maxWidth / BASE_CANVAS_WIDTH, maxHeight / BASE_CANVAS_HEIGHT));
   const displayWidth = Math.round(BASE_CANVAS_WIDTH * scale);
   const displayHeight = Math.round(BASE_CANVAS_HEIGHT * scale);
@@ -172,9 +188,53 @@ function syncTouchModeFromDevice() {
   if (coarsePointerQuery.matches) setTouchMode(true);
 }
 
-function releaseMovementControl(control: "left" | "right", button: HTMLElement) {
-  touchState[control] = false;
-  button.classList.remove("is-active");
+function resetJoystickVisual() {
+  if (!joystick.thumb || !joystick.zone) return;
+  joystick.thumb.style.setProperty("--joy-x", "0px");
+  joystick.thumb.style.setProperty("--joy-y", "0px");
+  joystick.zone.classList.remove("is-active");
+}
+
+function remapDeadZone(value: number) {
+  const magnitude = Math.abs(value);
+  if (magnitude <= JOYSTICK_DEAD_ZONE) return 0;
+  const normalized = (magnitude - JOYSTICK_DEAD_ZONE) / (1 - JOYSTICK_DEAD_ZONE);
+  return Math.sign(value) * clamp(normalized, 0, 1);
+}
+
+function setJoystickTarget(targetX: number, targetY: number) {
+  touchState.targetAxisX = remapDeadZone(clamp(targetX, -1, 1));
+  touchState.targetAxisY = remapDeadZone(clamp(targetY, -1, 1));
+}
+
+function updateJoystickFromPointer(clientX: number, clientY: number) {
+  if (!joystick.base || !joystick.thumb) return;
+  const rect = joystick.base.getBoundingClientRect();
+  const centerX = rect.left + rect.width * 0.5;
+  const centerY = rect.top + rect.height * 0.5;
+  const radius = Math.min(rect.width, rect.height) * 0.5;
+  const maxTravel = Math.max(MIN_JOYSTICK_TRAVEL, radius * JOYSTICK_TRAVEL_RATIO);
+  const rawX = clientX - centerX;
+  const rawY = clientY - centerY;
+  const distance = Math.hypot(rawX, rawY);
+  const clampedScale = distance > maxTravel ? maxTravel / distance : 1;
+  const clampedX = rawX * clampedScale;
+  const clampedY = rawY * clampedScale;
+  const axisX = clamp(clampedX / maxTravel, -1, 1);
+  const axisY = clamp(clampedY / maxTravel, -1, 1);
+  joystick.thumb.style.setProperty("--joy-x", `${clampedX.toFixed(2)}px`);
+  joystick.thumb.style.setProperty("--joy-y", `${clampedY.toFixed(2)}px`);
+  setJoystickTarget(axisX, axisY);
+}
+
+function updateTouchMovementInput(dt: number) {
+  // Exponential smoothing yields quick response while damping jitter from touch micro-movements.
+  const blend = 1 - Math.exp(-JOYSTICK_SMOOTHING * dt);
+  touchState.axisX += (touchState.targetAxisX - touchState.axisX) * blend;
+  touchState.axisY += (touchState.targetAxisY - touchState.axisY) * blend;
+
+  if (Math.abs(touchState.axisX) <= JOYSTICK_AXIS_EPSILON) touchState.axisX = 0;
+  if (Math.abs(touchState.axisY) <= JOYSTICK_AXIS_EPSILON) touchState.axisY = 0;
 }
 
 window.addEventListener("keydown", (event) => {
@@ -244,39 +304,44 @@ hud.invulnerableToggleButton!.addEventListener("click", () => {
   toggleInvulnerability();
 });
 
-for (const button of document.querySelectorAll("[data-touch]")) {
-  const control = (button as HTMLElement).dataset.touch as "left" | "right";
-  let activePointerId: number | null = null;
-
-  const press = (event: PointerEvent) => {
-    if (activePointerId !== null) return;
+if (joystick.zone) {
+  const onPointerDown = (event: PointerEvent) => {
+    if (touchState.joystickPointerId !== null) return;
     event.preventDefault();
     setTouchMode(true);
     audio.ensureAudio();
-    if (!state.started) { startRun(); }
-    activePointerId = event.pointerId;
-    (button as HTMLElement).setPointerCapture(event.pointerId);
-    touchState[control] = true;
-    (button as HTMLElement).classList.add("is-active");
+    if (!state.started) startRun();
+    touchState.joystickPointerId = event.pointerId;
+    joystick.zone!.setPointerCapture(event.pointerId);
+    joystick.zone!.classList.add("is-active");
+    updateJoystickFromPointer(event.clientX, event.clientY);
   };
 
-  const release = (event: PointerEvent) => {
-    if (activePointerId !== event.pointerId) return;
+  const onPointerMove = (event: PointerEvent) => {
+    if (touchState.joystickPointerId !== event.pointerId) return;
     event.preventDefault();
-    activePointerId = null;
-    releaseMovementControl(control, button as HTMLElement);
-    if ((button as HTMLElement).hasPointerCapture(event.pointerId)) {
-      (button as HTMLElement).releasePointerCapture(event.pointerId);
+    updateJoystickFromPointer(event.clientX, event.clientY);
+  };
+
+  const releaseJoystick = (event: PointerEvent) => {
+    if (touchState.joystickPointerId !== event.pointerId) return;
+    event.preventDefault();
+    touchState.joystickPointerId = null;
+    setJoystickTarget(0, 0);
+    resetJoystickVisual();
+    if (joystick.zone!.hasPointerCapture(event.pointerId)) {
+      joystick.zone!.releasePointerCapture(event.pointerId);
     }
   };
 
-  button.addEventListener("pointerdown", press);
-  button.addEventListener("pointerup", release);
-  button.addEventListener("pointercancel", release);
-  button.addEventListener("lostpointercapture", () => {
-    if (activePointerId === null) return;
-    activePointerId = null;
-    releaseMovementControl(control, button as HTMLElement);
+  joystick.zone.addEventListener("pointerdown", onPointerDown);
+  joystick.zone.addEventListener("pointermove", onPointerMove);
+  joystick.zone.addEventListener("pointerup", releaseJoystick);
+  joystick.zone.addEventListener("pointercancel", releaseJoystick);
+  joystick.zone.addEventListener("lostpointercapture", () => {
+    touchState.joystickPointerId = null;
+    setJoystickTarget(0, 0);
+    resetJoystickVisual();
   });
 }
 
@@ -1390,6 +1455,7 @@ function updatePuzzleSystems(dt) {
 function updatePlayer(dt) {
   const player = state.player;
   const movement = getMovementTuning(state, player);
+  updateTouchMovementInput(dt);
   player.actionStateTimer += dt;
 
   player.coyoteTimer -= dt;
@@ -1407,7 +1473,7 @@ function updatePlayer(dt) {
 
   const moveAxis = getMoveAxis();
   player.moveAxis = moveAxis;
-  if (moveAxis !== 0) player.facing = moveAxis;
+  if (moveAxis !== 0) player.facing = Math.sign(moveAxis);
 
   if (player.dashTimer > 0) {
     player.dashTimer -= dt;
@@ -1460,8 +1526,9 @@ function updatePlayer(dt) {
 }
 
 function getMoveAxis() {
-  return (keys.has("KeyD") || keys.has("ArrowRight") || touchState.right ? 1 : 0)
-    - (keys.has("KeyA") || keys.has("ArrowLeft") || touchState.left ? 1 : 0);
+  const keyboardAxis = (keys.has("KeyD") || keys.has("ArrowRight") ? 1 : 0)
+    - (keys.has("KeyA") || keys.has("ArrowLeft") ? 1 : 0);
+  return clamp(keyboardAxis + touchState.axisX, -1, 1);
 }
 
 function getPlayerGravity(player, movement = getMovementTuning(state, player)) {

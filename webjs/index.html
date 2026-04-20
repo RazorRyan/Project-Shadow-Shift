@@ -62,16 +62,28 @@
       <canvas id="gameCanvas" width="1280" height="720" aria-label="Shadow Shift game view"></canvas>
       <div id="touchHud" class="touch-hud" aria-label="Touch controls">
         <div class="touch-cluster touch-move">
-          <button class="touch-button touch-wide" data-touch="left" aria-label="Move left">Left</button>
-          <button class="touch-button touch-wide" data-touch="right" aria-label="Move right">Right</button>
+          <div id="touchJoystick" class="touch-joystick" aria-label="Movement joystick">
+            <div id="touchJoystickBase" class="touch-joystick-base">
+              <div id="touchJoystickThumb" class="touch-joystick-thumb"></div>
+            </div>
+          </div>
         </div>
-        <div class="touch-cluster touch-actions">
-          <button class="touch-button touch-jump" data-touch-tap="jump" aria-label="Jump">Jump</button>
-          <button class="touch-button" data-touch-tap="attack" aria-label="Attack">Attack</button>
-          <button class="touch-button" data-touch-tap="dash" aria-label="Dash">Dash</button>
-          <button class="touch-button" data-touch-tap="swap" aria-label="Shadow swap">Swap</button>
-          <button class="touch-button" data-touch-tap="interact" aria-label="Interact">Interact</button>
-          <button class="touch-button" data-touch-tap="element" aria-label="Cycle element">Element</button>
+        <div class="touch-facepad">
+          <div class="facepad-secondary">
+            <button class="touch-button facepad-sm" data-touch-tap="interact" aria-label="Interact">R</button>
+            <button class="touch-button facepad-sm" data-touch-tap="element" aria-label="Cycle element">E</button>
+          </div>
+          <div class="facepad-grid">
+            <span class="facepad-empty"></span>
+            <button class="touch-button facepad-btn facepad-y" data-touch-tap="swap" aria-label="Shadow swap">Y</button>
+            <span class="facepad-empty"></span>
+            <button class="touch-button facepad-btn facepad-x" data-touch-tap="dash" aria-label="Dash">X</button>
+            <span class="facepad-empty"></span>
+            <button class="touch-button facepad-btn facepad-b" data-touch-tap="attack" aria-label="Attack">B</button>
+            <span class="facepad-empty"></span>
+            <button class="touch-button facepad-btn facepad-a" data-touch-tap="jump" aria-label="Jump">A</button>
+            <span class="facepad-empty"></span>
+          </div>
         </div>
       </div>
       <div id="startOverlay" class="screen-overlay">
@@ -112,4 +124,3 @@
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
-
