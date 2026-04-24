@@ -1,0 +1,14 @@
+# wrangler.toml — Deployment Email Notification Worker
+# This file configures the standalone Cloudflare Worker that handles
+# Cloudflare Pages deployment webhook events and sends email notifications.
+#
+# The main Pages site configuration is in wrangler.jsonc.
+# Do NOT set WEBHOOK_SECRET here — add it as a secret via the dashboard
+# or `wrangler secret put WEBHOOK_SECRET`.
+
+name = "deployment-email-worker"
+main = "workers/deployment-email-worker.js"
+compatibility_date = "2026-04-24"
+
+[[send_email]]
+name = "SEND_EMAIL"
