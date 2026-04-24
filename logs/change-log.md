@@ -31,8 +31,44 @@ Fixed the mobile web layout so the game fills the entire screen edge-to-edge on 
 | Secondary buttons (facepad-sm) | 38 × 28 px | 32 × 24 px |
 | Touch button minimum | 56 × 56 px | 48 × 48 px |
 
-### Files Modified
-- `webjs/styles.css` — fullscreen CSS fixes, safe-area insets for landscape, control size reduction across all breakpoints
 
-### Files Created
-- `logs/change-log.md` — this file (new PR-level change log)
+---
+
+## 2026-04-24 — Fix: Phaser-v2 Mobile Fullscreen (Cloudflare Target)
+
+**PR:** Mobile Fullscreen + Control Optimization (follow-up fix)
+
+### Root Cause
+
+The previous PR (#1) applied all CSS changes to `webjs/styles.css`. However, Cloudflare (`wrangler.jsonc`) is configured to serve from the `phaser-v2/` directory. The `phaser-v2` version had:
+- No Phaser Scale Manager — canvas was always rendered at 1280×720 px (larger than any phone screen), causing overflow and cropping on mobile
+- CSS with hard-coded `min-height: 768px`, `padding: 24px`, no `dvh` units, and no mobile layout
+- Viewport meta tag missing `viewport-fit=cover`
+
+### Changes
+
+#### Phaser Scale Manager (`phaser-v2/phaser/config/gameConfig.js`)
+- Added `scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 1280, height: 720 }` to the game config
+- `FIT` mode scales the canvas to fill its parent div while maintaining 16:9 aspect ratio; `CENTER_BOTH` centers it
+- Removed top-level `width`/`height` (now owned by the `scale` config)
+
+#### Mobile Fullscreen CSS (`phaser-v2/styles.css`)
+- Added `html` reset: `margin: 0; padding: 0; height: 100%; overflow: hidden`
+- Changed `body` to use `min-height: 100dvh` (dynamic viewport height) instead of `100vh`
+- Added `overflow: hidden; overscroll-behavior: none; touch-action: none` to body
+- Added `min-height: 100dvh` to `.app-shell`
+- Updated `@media (max-width: 1100px)` to also match `(hover: none) and (pointer: coarse)`:
+  - `.app-shell`: `padding: 0; gap: 0; height: 100dvh` — removes all desktop margins
+  - `.hud-panel`: `display: none` — hides sidebar on mobile
+  - `.game-panel`: `height: 100dvh; border-radius: 0; border: none; box-shadow: none` + safe-area insets for notched devices
+  - `#phaser-root`: `height: 100%; min-height: 0` — allows Phaser Scale Manager to measure full panel
+
+#### Viewport Meta Tag (`phaser-v2/index.html`)
+- Added `viewport-fit=cover` (enables safe-area inset support for notched/curved screens)
+- Added `maximum-scale=1.0, user-scalable=no` (prevents pinch-zoom interference)
+
+### Files Modified
+- `phaser-v2/phaser/config/gameConfig.js`
+- `phaser-v2/styles.css`
+- `phaser-v2/index.html`
+
