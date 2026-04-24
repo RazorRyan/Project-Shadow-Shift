@@ -20,6 +20,14 @@
   box-sizing: border-box;
 }
 
+/* Mobile fullscreen fix: reset html element to prevent any scroll or offset */
+html {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
 html,
 body {
   height: 100%;
@@ -376,10 +384,11 @@ canvas {
   justify-content: flex-end;
 }
 
+/* Control size reduced ~15% from original 54px for better gameplay visibility */
 .facepad-grid {
   display: grid;
-  grid-template-columns: repeat(3, 54px);
-  grid-template-rows: repeat(3, 54px);
+  grid-template-columns: repeat(3, 46px);
+  grid-template-rows: repeat(3, 46px);
   gap: 3px;
 }
 
@@ -388,15 +397,15 @@ canvas {
 }
 
 .facepad-btn {
-  width: 54px;
-  height: 54px;
+  width: 46px;
+  height: 46px;
   min-width: unset;
   min-height: unset;
   border-radius: 999px;
   padding: 0;
   display: grid;
   place-items: center;
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -409,13 +418,13 @@ canvas {
 
 .facepad-sm {
   min-width: unset;
-  width: 38px;
-  height: 28px;
+  width: 32px;
+  height: 24px;
   border-radius: 10px;
   padding: 0;
   display: grid;
   place-items: center;
-  font-size: 0.63rem;
+  font-size: 0.60rem;
   font-weight: 600;
   letter-spacing: 0.05em;
 }
@@ -424,9 +433,10 @@ canvas {
   align-items: end;
 }
 
+/* Joystick zone size reduced ~15% from original 132px */
 .touch-joystick {
-  width: 132px;
-  height: 132px;
+  width: 112px;
+  height: 112px;
   display: grid;
   place-items: center;
   pointer-events: auto;
@@ -449,8 +459,8 @@ canvas {
 }
 
 .touch-joystick-thumb {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 999px;
   border: 1px solid rgba(231, 238, 255, 0.28);
   background:
@@ -467,8 +477,8 @@ canvas {
 }
 
 .touch-button {
-  min-width: 56px;
-  min-height: 56px;
+  min-width: 48px;
+  min-height: 48px;
   padding: 8px 10px;
   border-radius: 18px;
   border: 1px solid rgba(227, 236, 255, 0.16);
@@ -520,6 +530,9 @@ body.touch-mode .death-overlay {
 
 body.touch-mode .app {
   grid-template-columns: 1fr;
+  /* Mobile fullscreen: fill entire viewport height edge-to-edge */
+  height: 100dvh;
+  overflow: hidden;
 }
 
 body.touch-mode .hud-panel {
@@ -527,7 +540,9 @@ body.touch-mode .hud-panel {
 }
 
 body.touch-mode .game-panel {
+  /* Mobile fullscreen: enforce exact 100dvh so canvas fills screen edge-to-edge */
   min-height: 100dvh;
+  height: 100dvh;
   padding: 0;
 }
 
@@ -632,9 +647,14 @@ body.touch-mode canvas {
 }
 
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  /* Landscape fullscreen: game panel must fill entire viewport height edge-to-edge */
   .game-panel {
     min-height: 100dvh;
+    height: 100dvh;
     padding-top: max(8px, env(safe-area-inset-top));
+    padding-bottom: max(8px, env(safe-area-inset-bottom));
+    padding-left: max(0px, env(safe-area-inset-left));
+    padding-right: max(0px, env(safe-area-inset-right));
   }
 
   .touch-hud {
@@ -642,9 +662,10 @@ body.touch-mode canvas {
     gap: 22px;
   }
 
+  /* Landscape control sizes reduced ~15% from original 136px joystick / 50px buttons */
   .touch-joystick {
-    width: 136px;
-    height: 136px;
+    width: 116px;
+    height: 116px;
   }
 
   .touch-facepad {
@@ -652,13 +673,13 @@ body.touch-mode canvas {
   }
 
   .facepad-grid {
-    grid-template-columns: repeat(3, 50px);
-    grid-template-rows: repeat(3, 50px);
+    grid-template-columns: repeat(3, 43px);
+    grid-template-rows: repeat(3, 43px);
   }
 
   .facepad-btn {
-    width: 50px;
-    height: 50px;
+    width: 43px;
+    height: 43px;
   }
 }
 
@@ -677,37 +698,37 @@ body.touch-mode canvas {
   }
 
   .facepad-grid {
-    grid-template-columns: repeat(3, 46px);
-    grid-template-rows: repeat(3, 46px);
+    grid-template-columns: repeat(3, 40px);
+    grid-template-rows: repeat(3, 40px);
   }
 
   .facepad-btn {
-    width: 46px;
-    height: 46px;
-    font-size: 0.68rem;
+    width: 40px;
+    height: 40px;
+    font-size: 0.64rem;
   }
 
   .facepad-sm {
-    width: 34px;
-    height: 26px;
-    font-size: 0.58rem;
+    width: 30px;
+    height: 24px;
+    font-size: 0.56rem;
   }
 
   .touch-joystick {
-    width: 112px;
-    height: 112px;
+    width: 96px;
+    height: 96px;
   }
 
   .touch-joystick-thumb {
-    width: 48px;
-    height: 48px;
+    width: 41px;
+    height: 41px;
   }
 
   .touch-button {
-    min-width: 52px;
-    min-height: 52px;
-    border-radius: 16px;
-    font-size: 0.68rem;
+    min-width: 44px;
+    min-height: 44px;
+    border-radius: 14px;
+    font-size: 0.66rem;
     padding: 8px 10px;
   }
 
