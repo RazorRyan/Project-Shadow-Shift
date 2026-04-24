@@ -10,6 +10,8 @@ export const gameConfig = {
     mode: Phaser.Scale.EXPAND,
     width: 1280,
     height: 720,
+    autoCenter: Phaser.Scale.NO_CENTER,
+    expandParent: false,
   },
   physics: {
     default: "arcade",

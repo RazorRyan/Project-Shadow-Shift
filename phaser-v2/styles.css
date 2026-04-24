@@ -322,17 +322,20 @@ button {
     padding-right: 0;
   }
 
+  /* Absolutely fill .game-panel with no reliance on height-inheritance or
+     dvh timing — getBoundingClientRect() will always return full-screen
+     dimensions when Phaser reads the parent at init time. */
   #phaser-root {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    inset: 0;
     min-height: 0;
   }
 
-  /* Ensure the canvas fills its container on every render frame; pairs with
-     Phaser.Scale.EXPAND which also targets 100% of the parent. */
+  /* Phaser sets canvas inline styles; match them so there is never a flash
+     of mis-sized canvas between first paint and Phaser's first scale tick. */
   #phaser-root canvas {
-    width: 100%;
-    height: 100%;
-    margin: 0;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
   }
 }
