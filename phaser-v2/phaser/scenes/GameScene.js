@@ -209,23 +209,32 @@ export class GameScene extends Phaser.Scene {
     const layerA = isAsh ? 0x241412 : 0x0e1420;
     const layerB = isAsh ? 0x311c18 : 0x11192a;
 
-    this.add.rectangle(640, 360, 1280, 720, sky);
+    // Use a wide backdrop (3× the base width) so ultra-wide screens (e.g. 19.5:9)
+    // see sky/floor instead of void beyond the base 1280-unit world boundary.
+    const WIDE = 3840;
+    this.add.rectangle(640, 360, WIDE, 720, sky);
     this.add.circle(950, 110, 180, moonGlow, isAsh ? 0.14 : 0.1);
     this.add.circle(280, 128, 124, secondaryGlow, isAsh ? 0.08 : 0.06);
-    this.add.rectangle(640, 650, 1280, 240, floor, 0.9);
+    this.add.rectangle(640, 650, WIDE, 240, floor, 0.9);
 
     for (const layer of [
       { y: 500, color: layerA, alpha: 0.9, points: [0, 460, 160, 402, 320, 432, 520, 376, 760, 450, 970, 395, 1280, 446] },
       { y: 560, color: layerB, alpha: 0.8, points: [0, 520, 170, 470, 370, 508, 640, 448, 860, 526, 1090, 474, 1280, 520] }
     ]) {
+      const firstY = layer.points[1];
+      const lastY  = layer.points[layer.points.length - 1];
       const graphics = this.add.graphics().setDepth(-1);
       graphics.fillStyle(layer.color, layer.alpha);
       graphics.beginPath();
-      graphics.moveTo(0, 720);
+      // Extend left edge far off-screen so no void shows on ultra-wide displays
+      graphics.moveTo(-WIDE / 2, 720);
+      graphics.lineTo(-WIDE / 2, firstY);
       for (let i = 0; i < layer.points.length; i += 2) {
         graphics.lineTo(layer.points[i], layer.points[i + 1]);
       }
-      graphics.lineTo(1280, 720);
+      // Extend right edge symmetrically
+      graphics.lineTo(WIDE, lastY);
+      graphics.lineTo(WIDE, 720);
       graphics.closePath();
       graphics.fillPath();
     }
