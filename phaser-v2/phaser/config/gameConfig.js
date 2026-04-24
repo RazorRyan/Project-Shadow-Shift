@@ -3,11 +3,11 @@ export const gameConfig = {
   parent: "phaser-root",
   backgroundColor: "#0a0d16",
   pixelArt: false,
-  // Mobile fullscreen: Scale Manager fits the canvas inside the parent container
-  // while preserving the 1280×720 internal resolution and centering the result.
+  // EXPAND fills the container fully and shows extra world on ultra-wide screens
+  // (e.g. Samsung S25 landscape 19.5:9). The internal 1280×720 baseline is the
+  // minimum visible area; wider devices simply see more of the game world.
   scale: {
-    mode: Phaser.Scale.FIT,
-    autoCenter: Phaser.Scale.CENTER_BOTH,
+    mode: Phaser.Scale.EXPAND,
     width: 1280,
     height: 720,
   },

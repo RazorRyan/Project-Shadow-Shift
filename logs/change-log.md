@@ -72,3 +72,27 @@ The previous PR (#1) applied all CSS changes to `webjs/styles.css`. However, Clo
 - `phaser-v2/styles.css`
 - `phaser-v2/index.html`
 
+
+---
+
+## 2026-04-24 — Fix: Expand Canvas to Fill Ultra-Wide Screens (Samsung S25)
+
+**PR:** Mobile Fullscreen + Control Optimization (follow-up fix #2)
+
+### Root Cause
+
+`Phaser.Scale.FIT` preserves the 16:9 aspect ratio and centres the canvas with black pillarboxes. On a Samsung S25 (19.5:9 landscape) this leaves ~141 game-units of dead space on each side. The phone's own Game Assistant overlay renders its virtual controller buttons in those black bars instead of overlapping the game.
+
+### Changes
+
+#### `Phaser.Scale.EXPAND` (`phaser-v2/phaser/config/gameConfig.js`)
+- Changed scale mode from `FIT` to `EXPAND`. With EXPAND the canvas fills the parent div fully; extra game-world is revealed on wider screens rather than being letterboxed/pillarboxed. The 1280×720 base resolution becomes the minimum visible area.
+- Removed `autoCenter` (not applicable in EXPAND — the canvas is always flush with the container).
+
+#### Wide backdrop geometry (`phaser-v2/phaser/scenes/GameScene.js`)
+- Sky and floor rectangles widened from 1280 to 3840 px so that ultra-wide viewports see backdrop colour rather than the engine default `#0a0d16`.
+- Terrain-silhouette polygons extended left to −1920 and right to 3840 at the height of their original edge points, so the jagged mountain silhouette blends seamlessly into the sky on any aspect ratio.
+
+### Files Modified
+- `phaser-v2/phaser/config/gameConfig.js`
+- `phaser-v2/phaser/scenes/GameScene.js`
