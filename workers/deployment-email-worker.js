@@ -15,6 +15,16 @@ import { createMimeMessage } from "mimetext";
 const RECIPIENT = "Ryan.chetty16@gmail.com";
 const SENDER = "noreply@notifications.projectshadowshift.com";
 
+/** Escape characters that have special meaning in HTML to prevent injection. */
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export default {
   async fetch(request, env) {
     // Only accept POST requests
@@ -84,20 +94,20 @@ export default {
     const htmlBody = `
 <!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"><title>${subject}</title></head>
+<head><meta charset="UTF-8"><title>${escapeHtml(subject)}</title></head>
 <body style="font-family:sans-serif;color:#222;max-width:600px;margin:0 auto;padding:24px">
   <h2 style="border-bottom:2px solid #333;padding-bottom:8px">
-    Project Shadow Shift &mdash; Deployment ${status}
+    Project Shadow Shift &mdash; Deployment ${escapeHtml(status)}
   </h2>
   <table style="width:100%;border-collapse:collapse">
-    <tr><td style="padding:6px 0;font-weight:bold;width:160px">Status</td><td style="padding:6px 0">${status}</td></tr>
-    <tr><td style="padding:6px 0;font-weight:bold">Environment</td><td style="padding:6px 0">${environment}</td></tr>
-    <tr><td style="padding:6px 0;font-weight:bold">Project</td><td style="padding:6px 0">${projectName}</td></tr>
-    <tr><td style="padding:6px 0;font-weight:bold">Branch</td><td style="padding:6px 0">${branch}</td></tr>
-    <tr><td style="padding:6px 0;font-weight:bold">Commit Message</td><td style="padding:6px 0">${commitMessage}</td></tr>
+    <tr><td style="padding:6px 0;font-weight:bold;width:160px">Status</td><td style="padding:6px 0">${escapeHtml(status)}</td></tr>
+    <tr><td style="padding:6px 0;font-weight:bold">Environment</td><td style="padding:6px 0">${escapeHtml(environment)}</td></tr>
+    <tr><td style="padding:6px 0;font-weight:bold">Project</td><td style="padding:6px 0">${escapeHtml(projectName)}</td></tr>
+    <tr><td style="padding:6px 0;font-weight:bold">Branch</td><td style="padding:6px 0">${escapeHtml(branch)}</td></tr>
+    <tr><td style="padding:6px 0;font-weight:bold">Commit Message</td><td style="padding:6px 0">${escapeHtml(commitMessage)}</td></tr>
     <tr><td style="padding:6px 0;font-weight:bold">Deployment URL</td>
-        <td style="padding:6px 0"><a href="${deploymentUrl}">${deploymentUrl}</a></td></tr>
-    <tr><td style="padding:6px 0;font-weight:bold">Timestamp</td><td style="padding:6px 0">${timestamp}</td></tr>
+        <td style="padding:6px 0"><a href="${escapeHtml(deploymentUrl)}">${escapeHtml(deploymentUrl)}</a></td></tr>
+    <tr><td style="padding:6px 0;font-weight:bold">Timestamp</td><td style="padding:6px 0">${escapeHtml(timestamp)}</td></tr>
   </table>
 </body>
 </html>`;
